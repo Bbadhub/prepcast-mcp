@@ -374,6 +374,7 @@ def create_app() -> web.Application:
         )
 
     app.router.add_get("/", handle_landing)
+    app.router.add_get("/index.html", handle_landing)
 
     async def handle_public_comparison(_: web.Request) -> web.StreamResponse:
         comparison = site_dir / "public-comparison.json"
