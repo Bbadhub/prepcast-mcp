@@ -41,6 +41,50 @@ def _baseline_by_dow(records: List[Dict]) -> Dict[str, float]:
     return {dow: statistics.mean(vals) for dow, vals in buckets.items() if vals}
 
 
+def _recency_weighted_forecast(records: List[Dict], target_dow: str, target_date: date) -> Optional[float]:
+    """
+    Operator-validated forecasting method (per Five Guys manager feedback):
+      1. Last week's same day-of-week      -> weight 0.50 (strongest signal)
+      2. Same DOW in last 4 weeks          -> weight 0.30
+      3. Same DOW in last 13 weeks (qtr)   -> weight 0.20 (baseline anchor)
+
+    Falls back gracefully if history is thin.
+    """
+    sales_by_date: Dict[str, float] = {}
+    for r in records:
+        try:
+            sales_by_date[r["date"]] = float(r["revenue"])
+        except Exception:
+            continue
+
+    def same_dow_lookback(weeks_back: int, num_weeks: int) -> List[float]:
+        vals = []
+        for w in range(weeks_back, weeks_back + num_weeks):
+            d = target_date - timedelta(weeks=w)
+            v = sales_by_date.get(d.isoformat())
+            if v is not None:
+                vals.append(v)
+        return vals
+
+    last_week = same_dow_lookback(1, 1)       # exactly 7 days ago
+    last_4w = same_dow_lookback(1, 4)         # last 4 same-dow days
+    last_13w = same_dow_lookback(1, 13)       # last quarter same-dow
+
+    if not last_13w:
+        return None  # not enough history
+
+    # Build weighted average
+    if last_week and last_4w and len(last_13w) >= 3:
+        w1 = statistics.mean(last_week) * 0.50
+        w2 = statistics.mean(last_4w) * 0.30
+        w3 = statistics.mean(last_13w) * 0.20
+        return w1 + w2 + w3
+    elif last_4w:
+        return statistics.mean(last_4w) * 0.60 + statistics.mean(last_13w) * 0.40
+    else:
+        return statistics.mean(last_13w)
+
+
 def _recent_trend(records: List[Dict], days: int = 14) -> Optional[float]:
     cutoff = date.today() - timedelta(days=days)
     recent = []
@@ -102,14 +146,19 @@ async def handle_forecast_sales(arguments: dict) -> str:
             "Tip: Even a few weeks of data gives you a useful baseline."
         )
 
+    # Primary: recency-weighted (last week 50% / last 4 weeks 30% / last quarter 20%)
+    projected = _recency_weighted_forecast(records, dow, td)
+
+    # Fallback: DOW average baseline + recent trend multiplier
     baselines = _baseline_by_dow(records)
     base = baselines.get(dow)
-
-    if base is None:
-        return f"No historical data for {dow}s yet. Upload more sales reports to build a baseline."
-
-    trend = _recent_trend(records)
-    projected = base * (trend if trend else 1.0)
+    if projected is None:
+        if base is None:
+            return f"No historical data for {dow}s yet. Upload more sales reports to build a baseline."
+        trend = _recent_trend(records)
+        projected = base * (trend if trend else 1.0)
+    elif base is None:
+        base = projected  # use recency estimate as display baseline
 
     event_note = ""
     if event_multiplier and event_multiplier > 0:
@@ -135,8 +184,8 @@ async def handle_forecast_sales(arguments: dict) -> str:
         f"",
         f"  Projected Revenue:  ${projected:,.0f}",
         f"  Confidence Range:   ${low:,.0f} - ${high:,.0f}  (+/-{variance_pct:.0f}%)",
-        f"  {dow} Baseline:      ${base:,.0f}",
-        f"  Recent Trend:       {'%.2fx' % trend if trend else 'not enough data yet'}",
+        f"  {dow} Baseline:      ${base:,.0f}  (all-time avg for {dow}s)",
+        f"  Method:             Last week 50% / Last 4 wks 30% / Last quarter 20%",
     ]
     if event_note:
         lines.append(f"  {event_note}")

@@ -46,62 +46,62 @@ RATIOS_FILE = os.path.join(DATA_DIR, "menu_ratios.json")
 
 DEFAULT_RATIOS = {
     # ---- PROTEINS ----
-    # Patties: standard burger=2, little=1 -> blended avg ~1.7 per burger order
-    # ~$16 avg ticket -> ~62 orders per $1k -> ~105 patties per $1k
-    "patties_per_1k":               105,
+    # Patties calibrated from operator data:
+    #   $3,000 sales -> 4-5 cases at $500/case -> ~540 patties
+    #   ~180 patties per $1,000 in sales
+    # Standard burger (2 patties) + little burger (1 patty), blended ~1.7 patties/order
+    "patties_per_1k":               180,
     # Split: 55% standard (2 patties), 35% little (1 patty), 10% other
     "standard_burger_pct":          0.55,
     "little_burger_pct":            0.35,
-    # Bacon: ~50% of all burger orders get bacon
+    # Bacon: ~50% of all burger orders get bacon (Applewood smoked, 2 strips)
     "bacon_burger_pct":             0.50,
-    # Bacon strips per bacon burger: 2 strips standard (Five Guys uses 2-strip portions)
     "bacon_strips_per_burger":      2,
-    # Hot dogs per $1k (Hebrew National all-beef franks, split lengthwise)
-    "hot_dogs_per_1k":              8,
-    # Bacon dog: ~40% of hot dog orders
+    # Hot dogs: operator data shows <20/day regardless of volume.
+    # At a $5k avg day that's <4 per $1k. Using 3/1k as conservative real-world floor.
+    "hot_dogs_per_1k":              3,
     "bacon_dog_pct":                0.40,
     "bacon_strips_per_dog":         2,
-    # BLT sandwich per $1k (exactly 6 strips bacon each)
-    "blt_per_1k":                   3,
+    # BLT sandwich per $1k (exactly 6 strips bacon each) — rare item
+    "blt_per_1k":                   2,
     "bacon_strips_per_blt":         6,
     # Grilled cheese per $1k
-    "grilled_cheese_per_1k":        5,
+    "grilled_cheese_per_1k":        4,
     # Veggie sandwich per $1k
-    "veggie_sandwich_per_1k":       3,
+    "veggie_sandwich_per_1k":       2,
 
     # ---- BREAD ----
-    # Sesame seed buns (burger buns = orders, not patties)
-    "burger_buns_per_1k":           62,   # matches burger order count
-    "hotdog_buns_per_1k":           8,    # matches hot dog count
+    # Burger orders = patties / blended patties-per-order (1.7)
+    "patties_per_order_blended":    1.7,
+    "hotdog_buns_per_1k":           3,    # tracks hot_dogs_per_1k
 
     # ---- DAIRY ----
-    # Cheese slices: ~70% of burgers get cheese, all grilled cheese x 2
-    "cheese_slices_per_1k":         50,
+    # Cheese: ~70% of burgers get cheese (1 slice each); grilled cheese = 2 slices
+    # At 180 patties/$1k -> ~106 orders/$1k -> ~74 cheese slices + ~8 grilled cheese = ~82/1k
+    "cheese_slices_per_1k":         82,
 
     # ---- FRIES ----
-    # Fries ordered with ~85% of meals - measured in pounds of potato
-    # Avg regular fries = ~0.9 lb potato before frying
-    "fry_portions_per_1k":          53,   # portions
-    "potato_lbs_per_portion":       0.90, # lbs raw potato per portion
+    # Five Guys Cajun/regular fries — ordered with most meals
+    # ~0.9 lb raw potato per portion; ~85% of orders include fries
+    "fry_portions_per_1k":          52,
+    "potato_lbs_per_portion":       0.90,
 
     # ---- TOPPINGS (active prep items) ----
-    # Grilled onions: ordered on ~30% of burgers
-    "grilled_onion_portions_per_1k": 19,
-    # Grilled mushrooms: ordered on ~15% of burgers
-    "grilled_mushroom_portions_per_1k": 10,
-    # Fresh-cut tomatoes, lettuce, jalapenos - estimated by order volume
-    "tomato_slices_per_1k":          45,
-    "lettuce_portions_per_1k":       45,
+    "grilled_onion_portions_per_1k":  18,
+    "grilled_mushroom_portions_per_1k": 9,
+    "tomato_slices_per_1k":           40,
+    "lettuce_portions_per_1k":        40,
 
     # ---- CASE / COST CONVERSIONS ----
-    # Patty case: 40 lb case, ~120 patties (3.3 oz each)
+    # Patty case: ~120 patties (3.3 oz each, 40 lb case)
+    # Operator-confirmed: $500/case
     "patty_case_lbs":               40,
     "patties_per_case":             120,
-    "patty_case_cost":              95,   # ~$95/case fresh beef (adjust to your supplier)
+    "patty_case_cost":              500,  # operator-confirmed $500/case
     # Bacon: 15 lb case, ~240 strips
     "bacon_strips_per_case":        240,
     "bacon_case_cost":              55,
-    # Hot dogs: case of 48
+    # Hot dogs: case of 48 (Hebrew National)
     "hotdogs_per_case":             48,
     "hotdog_case_cost":             35,
     # Potato: 50 lb bag
@@ -180,7 +180,10 @@ async def handle_generate_prep_list(arguments: dict) -> str:
     buf = 1 + (buffer_pct / 100.0)
 
     # ---- Burger order count estimate ----
-    burger_orders = k * 62  # ~62 burger orders per $1k
+    # Derive orders from patties / blended patties-per-order
+    patties_raw = k * r["patties_per_1k"]
+    blended = r.get("patties_per_order_blended", 1.7)
+    burger_orders = patties_raw / blended
     standard_orders = burger_orders * r["standard_burger_pct"]
     little_orders = burger_orders * r["little_burger_pct"]
 
@@ -210,7 +213,8 @@ async def handle_generate_prep_list(arguments: dict) -> str:
     veggie = int(k * r["veggie_sandwich_per_1k"] * buf)
 
     # ---- Bread ----
-    burger_buns = int(k * r["burger_buns_per_1k"] * buf)
+    # Buns = burger orders + grilled cheese + veggie (each needs one bun)
+    burger_buns = int((burger_orders + grilled_cheese + veggie) * buf)
     hotdog_buns = hot_dogs
 
     # ---- Dairy ----
