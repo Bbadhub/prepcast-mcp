@@ -220,7 +220,9 @@ def add_auth_routes(app: web.Application, usage_tracker):
         return web.json_response({
             "email": user["email"],
             "name": user.get("name", ""),
+            "location_id": user.get("location_id", "default"),
             "location_name": user.get("location_name", ""),
+            "role": user.get("role", "store"),
             "tier": user.get("tier", "trial"),
             "trial_active": trial_active,
             "trial_days_remaining": days_left,
