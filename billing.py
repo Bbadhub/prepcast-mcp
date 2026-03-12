@@ -79,7 +79,7 @@ class BillingConfig:
         self.stripe_webhook_secret = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
         self.free_tier_calls = int(os.environ.get("FREE_TIER_CALLS", "100"))
         self.rate_limit_rpm = int(os.environ.get("RATE_LIMIT_RPM", "60"))
-        self.usage_log_dir = os.environ.get("USAGE_LOG_DIR", "/data/usage")
+        self.usage_log_dir = os.environ.get("USAGE_LOG_DIR", "/tmp/prepcast/usage")
 
         self.affiliate_enabled = os.environ.get("AFFILIATE_ENABLED", "true").lower() == "true"
         self.default_affiliate_rate = float(os.environ.get("AFFILIATE_DEFAULT_RATE", "0.20"))
