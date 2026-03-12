@@ -1,5 +1,5 @@
 """
-{{SERVER_NAME}} - MCP Server (Protocol 2024-11-05)
+prepcast - MCP Server (Protocol 2024-11-05)
 
 A generic MCP server supporting both SSE and stdio transports.
 Drop in your tools, configure billing, and deploy.
@@ -9,7 +9,7 @@ Transports:
     - stdio for local Claude Desktop integration
 
 Usage:
-    python server.py              # SSE on port {{SERVER_PORT}}
+    python server.py              # SSE on port 8420
     python server.py --stdio      # stdio transport only
     python server.py --both       # Both SSE + stdio
     python server.py --port 9090  # Custom port
@@ -41,15 +41,15 @@ logging.basicConfig(
     format="[%(asctime)s] %(levelname)s %(name)s: %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
-logger = logging.getLogger("{{SERVER_NAME}}")
+logger = logging.getLogger("prepcast")
 
 # ---------------------------------------------------------------------------
 # Server metadata
 # ---------------------------------------------------------------------------
 
 SERVER_INFO = {
-    "name": "{{SERVER_NAME}}",
-    "version": "{{SERVER_VERSION}}",
+    "name": "prepcast",
+    "version": "0.1.0",
 }
 
 PROTOCOL_VERSION = "2024-11-05"
@@ -477,10 +477,10 @@ async def run_both(port: int, host: str):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="{{SERVER_NAME}} MCP Server")
+    parser = argparse.ArgumentParser(description="prepcast MCP Server")
     parser.add_argument("--stdio", action="store_true", help="Run in stdio mode (for Claude Desktop)")
     parser.add_argument("--both", action="store_true", help="Run both SSE and stdio transports")
-    parser.add_argument("--port", type=int, default=None, help="SSE server port (default: {{SERVER_PORT}})")
+    parser.add_argument("--port", type=int, default=None, help="SSE server port (default: 8420)")
     parser.add_argument("--host", type=str, default=None, help="SSE server host (default: 0.0.0.0)")
     args = parser.parse_args()
 

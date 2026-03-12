@@ -27,7 +27,7 @@ cp .env.example .env
 Health:
 
 ```bash
-curl http://localhost:{{SERVER_PORT}}/health
+curl http://localhost:8420/health
 ```
 
 ## Billing Endpoints

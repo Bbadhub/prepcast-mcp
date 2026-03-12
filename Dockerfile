@@ -12,11 +12,11 @@ COPY . .
 # Create data directory for billing state persistence
 RUN mkdir -p /data/usage
 
-EXPOSE {{SERVER_PORT}}
+EXPOSE 8420
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:{{SERVER_PORT}}/health')"
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8420/health')"
 
 # Run the MCP server (SSE transport by default)
 CMD ["python", "server.py"]

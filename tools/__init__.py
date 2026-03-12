@@ -1,30 +1,29 @@
 """
-Tool Registry for {{SERVER_NAME}}.
+PrepCast Tool Registry.
 
-Aggregates all tool definitions and handlers from sub-modules.
-Import your tool modules here and extend ALL_TOOLS / ALL_HANDLERS.
-
-To add a new tool module:
-    1. Create tools/my_tools.py with TOOLS list and HANDLERS dict
-    2. Import and extend below
+Aggregates all tool definitions and handlers.
 """
 
 from typing import Dict, List, Any, Callable, Coroutine
 
 from tools.example import TOOLS as EXAMPLE_TOOLS, HANDLERS as EXAMPLE_HANDLERS
-
-# ---------------------------------------------------------------------------
-# Aggregate all tool definitions and handler functions
-# ---------------------------------------------------------------------------
+from tools.sales_forecast import TOOLS as FORECAST_TOOLS, HANDLERS as FORECAST_HANDLERS
+from tools.prep_list import TOOLS as PREP_TOOLS, HANDLERS as PREP_HANDLERS
+from tools.events import TOOLS as EVENT_TOOLS, HANDLERS as EVENT_HANDLERS
+from tools.upload_report import TOOLS as UPLOAD_TOOLS, HANDLERS as UPLOAD_HANDLERS
 
 ALL_TOOLS: List[Dict[str, Any]] = [
-    *EXAMPLE_TOOLS,
-    # Add more tool lists here as you create new modules:
-    # *MY_TOOLS,
+    *FORECAST_TOOLS,   # forecast_sales, analyze_history
+    *PREP_TOOLS,       # generate_prep_list, update_menu_ratios, get_menu_ratios
+    *EVENT_TOOLS,      # get_upcoming_events, log_event_outcome, get_event_multipliers
+    *UPLOAD_TOOLS,     # upload_sales_csv, log_daily_sales, get_sales_summary
+    *EXAMPLE_TOOLS,    # echo, hello_world, get_status
 ]
 
 ALL_HANDLERS: Dict[str, Callable[..., Coroutine]] = {
+    **FORECAST_HANDLERS,
+    **PREP_HANDLERS,
+    **EVENT_HANDLERS,
+    **UPLOAD_HANDLERS,
     **EXAMPLE_HANDLERS,
-    # Add more handler dicts here:
-    # **MY_HANDLERS,
 }

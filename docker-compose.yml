@@ -6,16 +6,16 @@ services:
   # --------------------------------------------------------------------------
   mcp-server:
     build: .
-    container_name: {{SERVER_NAME}}
+    container_name: prepcast
     restart: unless-stopped
     ports:
-      - "${SERVER_PORT:-{{SERVER_PORT}}}:{{SERVER_PORT}}"
+      - "${SERVER_PORT:-8420}:8420"
     env_file:
       - .env
     volumes:
       - mcp-data:/data/usage
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:{{SERVER_PORT}}/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8420/health')"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -26,7 +26,7 @@ services:
   # --------------------------------------------------------------------------
   caddy:
     image: caddy:2-alpine
-    container_name: {{SERVER_NAME}}-caddy
+    container_name: prepcast-caddy
     restart: unless-stopped
     profiles:
       - proxy

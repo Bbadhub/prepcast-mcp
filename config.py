@@ -1,11 +1,11 @@
 """
-Configuration for {{SERVER_NAME}}.
+Configuration for prepcast.
 
 Loads all settings from environment variables with sensible defaults.
 Uses a singleton pattern so config is only parsed once.
 
 Environment Variables:
-    SERVER_PORT         - HTTP port for SSE transport (default: {{SERVER_PORT}})
+    SERVER_PORT         - HTTP port for SSE transport (default: 8420)
     SERVER_HOST         - Bind address (default: 0.0.0.0)
     SERVER_AUTH_TOKEN   - Bearer token for authentication (optional)
     SERVER_TRANSPORT    - Transport mode: sse, stdio, both (default: sse)
@@ -21,7 +21,7 @@ class ServerConfig:
     """Server configuration loaded from environment variables."""
 
     # --- Server ---
-    port: int = {{SERVER_PORT}}
+    port: int = 8420
     host: str = "0.0.0.0"
     auth_token: str = ""
     transport: str = "sse"  # sse | stdio | both
@@ -49,7 +49,7 @@ class ServerConfig:
         Custom fields should use your own prefix convention.
         """
         return cls(
-            port=int(os.environ.get("SERVER_PORT", "{{SERVER_PORT}}")),
+            port=int(os.environ.get("SERVER_PORT", "8420")),
             host=os.environ.get("SERVER_HOST", "0.0.0.0"),
             auth_token=os.environ.get("SERVER_AUTH_TOKEN", ""),
             transport=os.environ.get("SERVER_TRANSPORT", "sse"),
