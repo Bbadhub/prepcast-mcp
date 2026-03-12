@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: prepcast-mcp
+    runtime: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python server.py --port $PORT --host 0.0.0.0
+    envVars:
+      - key: PREPCAST_DATA_DIR
+        value: /tmp/prepcast
+      - key: SERVER_PORT
+        value: 8420
+    healthCheckPath: /health
