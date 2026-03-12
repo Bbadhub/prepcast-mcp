@@ -13,8 +13,16 @@
     * { box-sizing: border-box; }
     body { font-family: 'Inter', system-ui, sans-serif; background: #ffffff; color: #111827; }
 
+    /* Accent: indigo/blue — clean, professional, SaaS */
+    :root {
+      --accent: #4f46e5;
+      --accent-light: #eef2ff;
+      --accent-border: #c7d2fe;
+      --accent-hover: #4338ca;
+    }
+
     .btn-primary {
-      background: #f97316;
+      background: var(--accent);
       color: white;
       font-weight: 700;
       padding: 1rem 2.5rem;
@@ -25,7 +33,7 @@
       text-decoration: none;
       letter-spacing: -0.01em;
     }
-    .btn-primary:hover { background: #ea580c; transform: translateY(-1px); }
+    .btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
 
     .btn-outline {
       border: 2px solid #e5e7eb;
@@ -37,23 +45,22 @@
       transition: border-color 0.2s, color 0.2s;
       display: inline-block;
       text-decoration: none;
+      background: white;
     }
-    .btn-outline:hover { border-color: #f97316; color: #f97316; }
+    .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
 
-    .hero-gradient {
-      background: linear-gradient(170deg, #fff7ed 0%, #ffffff 50%);
-    }
+    .hero-gradient { background: linear-gradient(160deg, #eef2ff 0%, #ffffff 55%); }
 
     .card {
       background: #fff;
-      border: 1px solid #f3f4f6;
+      border: 1px solid #e5e7eb;
       border-radius: 1rem;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.04);
     }
 
     .stat-card {
-      background: #fff7ed;
-      border: 1px solid #fed7aa;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
       border-radius: 0.875rem;
       padding: 1.5rem;
       text-align: center;
@@ -61,7 +68,7 @@
 
     .quote-card {
       background: #f9fafb;
-      border-left: 4px solid #f97316;
+      border-left: 4px solid var(--accent);
       border-radius: 0 0.75rem 0.75rem 0;
       padding: 1.25rem 1.5rem;
     }
@@ -72,7 +79,7 @@
       align-items: flex-start;
       padding: 1.25rem;
       background: #fff;
-      border: 1px solid #fee2e2;
+      border: 1px solid #fecaca;
       border-radius: 0.75rem;
     }
 
@@ -82,7 +89,7 @@
       align-items: flex-start;
       padding: 1.25rem;
       background: #fff;
-      border: 1px solid #d1fae5;
+      border: 1px solid #bbf7d0;
       border-radius: 0.75rem;
     }
 
@@ -97,8 +104,8 @@
     }
 
     .chat-bubble-ai {
-      background: #fff7ed;
-      border: 1px solid #fed7aa;
+      background: #f8faff;
+      border: 1px solid #c7d2fe;
       border-radius: 1.25rem 1.25rem 1.25rem 0.25rem;
       padding: 1rem 1.25rem;
       max-width: 90%;
@@ -106,6 +113,12 @@
       color: #111827;
       font-family: 'JetBrains Mono', 'Fira Code', monospace;
       line-height: 1.7;
+    }
+
+    .connect-strip {
+      background: var(--accent-light);
+      border-top: 1px solid var(--accent-border);
+      border-bottom: 1px solid var(--accent-border);
     }
   </style>
 </head>
@@ -122,6 +135,7 @@
         <a href="#problem" class="hover:text-gray-900 transition-colors">The Problem</a>
         <a href="#how" class="hover:text-gray-900 transition-colors">How It Works</a>
         <a href="#demo" class="hover:text-gray-900 transition-colors">See It</a>
+        <a href="science.html" class="hover:text-gray-900 transition-colors">The Science</a>
       </div>
       <a href="#contact" class="btn-primary py-2.5 px-6 text-sm">Request Access</a>
     </div>
@@ -131,14 +145,14 @@
   <section class="hero-gradient pt-24 pb-20 px-6">
     <div class="max-w-5xl mx-auto text-center">
 
-      <div class="inline-flex items-center gap-2 bg-orange-100 text-orange-700 text-sm font-semibold px-4 py-2 rounded-full mb-8">
-        <span class="w-2 h-2 bg-orange-500 rounded-full"></span>
+      <div class="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-full mb-8" style="background: var(--accent-light); color: var(--accent); border: 1px solid var(--accent-border);">
+        <span class="w-2 h-2 rounded-full" style="background: var(--accent);"></span>
         AI-powered restaurant prep forecasting
       </div>
 
       <h1 class="text-6xl md:text-7xl font-black leading-none tracking-tight mb-6 text-gray-900">
         Know what to make<br/>
-        <span style="color: #f97316;">before you open.</span>
+        <span style="color: var(--accent);">before you open.</span>
       </h1>
 
       <p class="text-xl md:text-2xl text-gray-500 max-w-3xl mx-auto mb-10 leading-relaxed font-normal">
@@ -159,13 +173,13 @@
   </section>
 
   <!-- SIMPLE CONNECT STRIP -->
-  <section class="bg-orange-500 py-6 px-6">
+  <section class="connect-strip py-6 px-6">
     <div class="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-      <div class="text-white text-center md:text-left">
-        <p class="font-black text-lg tracking-tight">Already have Claude? You're 10 seconds away.</p>
-        <p class="text-orange-100 text-sm mt-0.5">Paste this URL into Claude → Integrations and PrepCast is live instantly.</p>
+      <div class="text-center md:text-left">
+        <p class="font-black text-lg tracking-tight text-gray-900">Already have Claude? You're 10 seconds away.</p>
+        <p class="text-gray-500 text-sm mt-0.5">Paste this URL into Claude → Integrations and PrepCast is live instantly.</p>
       </div>
-      <div class="flex items-center gap-3 bg-white rounded-lg px-4 py-3 font-mono text-sm text-orange-600 font-bold whitespace-nowrap shadow select-all">
+      <div class="flex items-center gap-3 bg-white rounded-lg px-4 py-3 font-mono text-sm font-bold whitespace-nowrap shadow-sm select-all border border-indigo-200" style="color: var(--accent);">
         prepcast-mcp.onrender.com/sse
       </div>
     </div>
@@ -175,19 +189,19 @@
   <section class="bg-white py-16 px-6 border-y border-gray-100">
     <div class="max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6">
       <div class="stat-card">
-        <div class="text-4xl font-black text-orange-500">±8%</div>
+        <div class="text-4xl font-black" style="color: var(--accent);">±8%</div>
         <div class="text-sm font-medium text-gray-600 mt-1">forecast accuracy</div>
       </div>
       <div class="stat-card">
-        <div class="text-4xl font-black text-orange-500">&lt;60s</div>
+        <div class="text-4xl font-black" style="color: var(--accent);">&lt;60s</div>
         <div class="text-sm font-medium text-gray-600 mt-1">to a full prep list</div>
       </div>
       <div class="stat-card">
-        <div class="text-4xl font-black text-orange-500">30+</div>
-        <div class="text-sm font-medium text-gray-600 mt-1">days to full accuracy</div>
+        <div class="text-4xl font-black" style="color: var(--accent);">Day 1</div>
+        <div class="text-sm font-medium text-gray-600 mt-1">works immediately</div>
       </div>
       <div class="stat-card">
-        <div class="text-4xl font-black text-orange-500">$0</div>
+        <div class="text-4xl font-black" style="color: var(--accent);">$0</div>
         <div class="text-sm font-medium text-gray-600 mt-1">to get started</div>
       </div>
     </div>
@@ -249,17 +263,17 @@
 
       <div class="grid md:grid-cols-3 gap-8">
         <div class="text-center">
-          <div class="w-16 h-16 bg-orange-100 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-5">📊</div>
+          <div class="w-16 h-16 rounded-2xl" style="background: var(--accent-light) flex items-center justify-center text-3xl mx-auto mb-5">📊</div>
           <h3 class="font-bold text-gray-900 text-lg mb-2">Learns your store</h3>
           <p class="text-gray-500 text-sm leading-relaxed">Upload your existing daily sales reports. PrepCast builds a baseline — your average Tuesday, your typical Saturday, how you perform week over week.</p>
         </div>
         <div class="text-center">
-          <div class="w-16 h-16 bg-orange-100 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-5">🏟️</div>
+          <div class="w-16 h-16 rounded-2xl" style="background: var(--accent-light) flex items-center justify-center text-3xl mx-auto mb-5">🏟️</div>
           <h3 class="font-bold text-gray-900 text-lg mb-2">Factors in events</h3>
           <p class="text-gray-500 text-sm leading-relaxed">Tell it about a volleyball tournament, a soccer match, a cornhole event. PrepCast knows the difference and adjusts your projection accordingly.</p>
         </div>
         <div class="text-center">
-          <div class="w-16 h-16 bg-orange-100 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-5">✅</div>
+          <div class="w-16 h-16 rounded-2xl" style="background: var(--accent-light) flex items-center justify-center text-3xl mx-auto mb-5">✅</div>
           <h3 class="font-bold text-gray-900 text-lg mb-2">Gives you the list</h3>
           <p class="text-gray-500 text-sm leading-relaxed">Patties, bacon, hot dogs, buns, cheese — every item with quantities, case counts, and dollar estimates. Log your actuals and it gets smarter every day.</p>
         </div>
@@ -384,14 +398,14 @@
   </section>
 
   <!-- CTA / CONTACT -->
-  <section id="contact" class="py-24 px-6" style="background: #111827;">
+  <section id="contact" class="py-24 px-6" style="background: var(--accent-light); border-top: 1px solid var(--accent-border);">
     <div class="max-w-2xl mx-auto text-center">
-      <h2 class="text-4xl md:text-5xl font-black text-white mb-6 tracking-tight">
+      <h2 class="text-4xl md:text-5xl font-black mb-6 tracking-tight text-gray-900">
         Ready to stop guessing?
       </h2>
-      <p class="text-gray-400 text-lg mb-10">
+      <p class="text-gray-500 text-lg mb-10">
         We're onboarding a small group of QSR operators for early access.
-        Get in touch and we'll set you up — free for the first 90 days.
+        Get in touch and we'll set you up — free to start.
       </p>
 
       <form class="flex flex-col sm:flex-row gap-3 max-w-md mx-auto mb-6" onsubmit="handleSubmit(event)">
@@ -399,25 +413,29 @@
           type="email"
           placeholder="your@email.com"
           id="email-input"
-          class="flex-1 px-4 py-3.5 rounded-lg border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 text-base"
+          class="flex-1 px-4 py-3.5 rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none text-base"
+          style="focus:border-color: var(--accent);"
           required
         />
         <button type="submit" class="btn-primary whitespace-nowrap py-3.5">Get Access</button>
       </form>
-      <p id="form-thanks" class="text-green-400 text-sm hidden">✓ Got it — we'll be in touch soon.</p>
-      <p class="text-gray-600 text-sm">No spam. No commitment. Just early access.</p>
+      <p id="form-thanks" class="text-green-600 text-sm hidden font-semibold">✓ Got it — we'll be in touch soon.</p>
+      <p class="text-gray-400 text-sm">No spam. No commitment. Just early access.</p>
     </div>
   </section>
 
   <!-- FOOTER -->
-  <footer class="bg-gray-900 border-t border-gray-800 py-8 px-6">
+  <footer class="bg-white border-t border-gray-200 py-8 px-6">
     <div class="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
       <div class="flex items-center gap-2">
         <span class="text-xl">🍔</span>
-        <span class="font-bold text-white">PrepCast</span>
-        <span class="text-gray-600 text-sm ml-2">Know what to make before you open.</span>
+        <span class="font-bold text-gray-900">PrepCast</span>
+        <span class="text-gray-400 text-sm ml-2">Know what to make before you open.</span>
       </div>
-      <div class="text-sm text-gray-600">© 2026 PrepCast · All rights reserved</div>
+      <div class="flex items-center gap-6 text-sm text-gray-400">
+        <a href="science.html" class="hover:text-gray-700 transition-colors">The Science</a>
+        <span>© 2026 PrepCast</span>
+      </div>
     </div>
   </footer>
 
