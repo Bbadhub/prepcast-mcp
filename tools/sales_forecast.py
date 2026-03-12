@@ -1,5 +1,5 @@
 """
-PrepCast — Sales Forecast Tool
+PrepCast - Sales Forecast Tool
 
 Given a location's historical daily sales data, project revenue for a target
 date factoring in day-of-week baseline, recent trend (EMA), and event multipliers.
@@ -118,7 +118,7 @@ async def handle_forecast_sales(arguments: dict) -> str:
     elif event_attendance and event_attendance > 0:
         est_mult = min(1.0 + (event_attendance / 1000) * 0.05, 1.60)
         projected *= est_mult
-        event_note = f"Event '{event_name}' ({event_attendance:,} attendees) → {est_mult:.2f}x multiplier"
+        event_note = f"Event '{event_name}' ({event_attendance:,} attendees) -> {est_mult:.2f}x multiplier"
 
     all_vals = [float(r["revenue"]) for r in records if "revenue" in r]
     if len(all_vals) >= 10:
@@ -131,10 +131,10 @@ async def handle_forecast_sales(arguments: dict) -> str:
     high = projected * (1 + variance_pct / 100)
 
     lines = [
-        f"SALES FORECAST — {td.strftime('%A, %B %d %Y')}",
+        f"SALES FORECAST - {td.strftime('%A, %B %d %Y')}",
         f"",
         f"  Projected Revenue:  ${projected:,.0f}",
-        f"  Confidence Range:   ${low:,.0f} – ${high:,.0f}  (±{variance_pct:.0f}%)",
+        f"  Confidence Range:   ${low:,.0f} - ${high:,.0f}  (+/-{variance_pct:.0f}%)",
         f"  {dow} Baseline:      ${base:,.0f}",
         f"  Recent Trend:       {'%.2fx' % trend if trend else 'not enough data yet'}",
     ]
@@ -193,12 +193,12 @@ async def handle_analyze_history(arguments: dict) -> str:
     for dow in dow_order:
         if dow in baselines:
             bar_len = int((baselines[dow] / max(baselines.values())) * 20)
-            bar = "█" * bar_len + "░" * (20 - bar_len)
+            bar = "#" * bar_len + "." * (20 - bar_len)
             dow_lines.append(f"  {dow:<10}  {bar}  ${baselines[dow]:,.0f}")
 
     lines = [
         f"SALES HISTORY ANALYSIS",
-        f"  Period:         {all_vals[0][0]} → {all_vals[-1][0]}  ({len(records)} days)",
+        f"  Period:         {all_vals[0][0]} -> {all_vals[-1][0]}  ({len(records)} days)",
         f"  Overall Avg:    ${mean_rev:,.0f}/day",
         f"  Best Day:       {best_day[0].strftime('%a %b %d')}  ${best_day[1]:,.0f}",
         f"  Worst Day:      {worst_day[0].strftime('%a %b %d')}  ${worst_day[1]:,.0f}",

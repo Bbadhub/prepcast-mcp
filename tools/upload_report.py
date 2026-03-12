@@ -1,5 +1,5 @@
 """
-PrepCast — Upload Report Tool
+PrepCast - Upload Report Tool
 
 Ingests daily sales reports from CSV or plain-text paste.
 Normalizes to {date, revenue} records and appends to sales_history.json.
@@ -127,7 +127,7 @@ UPLOAD_SALES_CSV_TOOL = {
     "name": "upload_sales_csv",
     "description": (
         "Import daily sales history from a CSV or text paste. "
-        "Paste your spreadsheet contents directly — the tool auto-detects date and revenue columns. "
+        "Paste your spreadsheet contents directly - the tool auto-detects date and revenue columns. "
         "Merges with existing history (duplicates by date are overwritten). "
         "After uploading, run analyze_history to see patterns."
     ),
@@ -188,7 +188,7 @@ async def handle_upload_sales_csv(arguments: dict) -> str:
 
     return (
         f"Imported {len(records)} records.\n"
-        f"  Date range: {records[0]['date']} → {records[-1]['date']}\n"
+        f"  Date range: {records[0]['date']} -> {records[-1]['date']}\n"
         f"  Total history: {len(final)} days\n"
         + (f"  Warnings ({len(errors)}):\n    " + "\n    ".join(errors[:3]) if errors else "")
         + f"\n\nRun analyze_history to see patterns, or forecast_sales to project revenue."
@@ -259,7 +259,7 @@ async def handle_get_sales_summary(arguments: dict) -> str:
     return (
         f"SALES HISTORY SUMMARY\n"
         f"  Records:       {len(records)} days\n"
-        f"  Date range:    {dates[0]} → {dates[-1]}\n"
+        f"  Date range:    {dates[0]} -> {dates[-1]}\n"
         f"  Avg revenue:   ${sum(revenues)/len(revenues):,.0f}/day\n"
         f"  Total revenue: ${sum(revenues):,.0f}\n"
         f"  Best day:      ${max(revenues):,.0f}\n"

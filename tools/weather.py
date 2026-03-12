@@ -132,16 +132,16 @@ async def handle_get_weather_forecast(arguments: dict) -> dict:
         lines = [
             f"Weather forecast for {target_date}:",
             f"  Condition: {condition.replace('_', ' ').title()}",
-            f"  Temperature: {temp_min:.0f}°F – {temp_max:.0f}°F",
+            f"  Temperature: {temp_min:.0f}°F - {temp_max:.0f}°F",
             f"  Precipitation: {precip:.1f} mm",
             f"  Sales impact: {impact} (multiplier: {multiplier:.2f}x)",
             "",
             f"Apply this multiplier to your base revenue forecast.",
         ]
         if multiplier <= 0.80:
-            lines.append("Note: Heavy rain/storm — consider reducing prep quantities significantly.")
+            lines.append("Note: Heavy rain/storm - consider reducing prep quantities significantly.")
         elif multiplier >= 1.05:
-            lines.append("Note: Great weather — consider adding 5-10% buffer to prep quantities.")
+            lines.append("Note: Great weather - consider adding 5-10% buffer to prep quantities.")
 
         return {"content": [{"type": "text", "text": "\n".join(lines)}]}
 

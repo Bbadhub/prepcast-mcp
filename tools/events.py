@@ -1,5 +1,5 @@
 """
-PrepCast — Events Tool
+PrepCast - Events Tool
 
 Manages event-based traffic multipliers for locations near sports venues.
 Supports AdventHealth Sports Park (Blue Hawk) in Overland Park KS by default.
@@ -141,15 +141,15 @@ async def handle_get_upcoming_events(arguments: dict) -> str:
                 events_found.append({"title": title, "date": event_date, "type": etype, "multiplier": mult})
 
     if events_found:
-        lines = [f"UPCOMING EVENTS — AdventHealth Sports Park", f"  {fetch_note}", f""]
+        lines = [f"UPCOMING EVENTS - AdventHealth Sports Park", f"  {fetch_note}", f""]
         for e in events_found[:10]:
             src = "learned" if e["type"] in learned else "estimated"
             lines.append(f"  {e['date']:<20}  {e['title'][:40]:<42}  {e['multiplier']:.2f}x  [{src}]")
-        lines += ["", "Use these multipliers in forecast_sales → event_multiplier param."]
+        lines += ["", "Use these multipliers in forecast_sales -> event_multiplier param."]
         return "\n".join(lines)
 
     lines = [
-        f"ADVENTHEALTH SPORTS PARK — EVENT LOOKUP",
+        f"ADVENTHEALTH SPORTS PARK - EVENT LOOKUP",
         f"  {fetch_note}",
         f"",
         f"  Check manually: https://www.adventhealthsportspark.com/events",
@@ -228,7 +228,7 @@ async def handle_log_event_outcome(arguments: dict) -> str:
 
 GET_EVENT_MULTIPLIERS_TOOL = {
     "name": "get_event_multipliers",
-    "description": "Show all event type multipliers — defaults and any learned from actual logged outcomes.",
+    "description": "Show all event type multipliers - defaults and any learned from actual logged outcomes.",
     "inputSchema": {"type": "object", "properties": {}, "required": []},
 }
 
@@ -248,7 +248,7 @@ async def handle_get_event_multipliers(arguments: dict) -> str:
         mult = learned.get(etype, DEFAULT_EVENT_MULTIPLIERS.get(etype, 1.15))
         source = "learned" if etype in learned else "default"
         count = sum(1 for o in outcomes if o.get("event_type") == etype)
-        lines.append(f"  {etype:<22}  {mult:>10.3f}x  {source:<12}  {count if count else '—'}")
+        lines.append(f"  {etype:<22}  {mult:>10.3f}x  {source:<12}  {count if count else '-'}")
 
     lines += ["", f"Total logged event days: {len(outcomes)}", "Use log_event_outcome to improve accuracy."]
     return "\n".join(lines)

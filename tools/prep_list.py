@@ -1,5 +1,5 @@
 """
-PrepCast — Prep List Tool (Five Guys Edition)
+PrepCast - Prep List Tool (Five Guys Edition)
 
 Converts a projected daily revenue into item-level prep quantities
 calibrated to the Five Guys menu: fresh-never-frozen beef patties,
@@ -10,14 +10,14 @@ Five Guys key facts:
   - Little burger = 1 patty
   - Bacon: Applewood smoked, prepped in full-day batches, must be crispy
   - Fries: Double-fried from fresh Burbank/Norkotah potatoes in peanut oil
-  - 15 free toppings — grilled onions + mushrooms require active prep
+  - 15 free toppings - grilled onions + mushrooms require active prep
   - BLT = exactly 6 strips of bacon
-  - No freezer, no microwave — everything fresh daily
+  - No freezer, no microwave - everything fresh daily
 
 Handlers:
-    generate_prep_list   — full Five Guys prep list for a projected revenue
-    update_menu_ratios   — manager calibrates ratios from actual outcomes
-    get_menu_ratios      — inspect current ratio config
+    generate_prep_list   - full Five Guys prep list for a projected revenue
+    update_menu_ratios   - manager calibrates ratios from actual outcomes
+    get_menu_ratios      - inspect current ratio config
 """
 
 import json
@@ -33,7 +33,7 @@ DATA_DIR = os.environ.get("PREPCAST_DATA_DIR", "/tmp/prepcast")
 RATIOS_FILE = os.path.join(DATA_DIR, "menu_ratios.json")
 
 # ---------------------------------------------------------------------------
-# Five Guys Default Ratios — units per $1,000 revenue
+# Five Guys Default Ratios - units per $1,000 revenue
 #
 # Based on:
 #   - Standard burger = 2 patties, little burger = 1 patty
@@ -46,8 +46,8 @@ RATIOS_FILE = os.path.join(DATA_DIR, "menu_ratios.json")
 
 DEFAULT_RATIOS = {
     # ---- PROTEINS ----
-    # Patties: standard burger=2, little=1 → blended avg ~1.7 per burger order
-    # ~$16 avg ticket → ~62 orders per $1k → ~105 patties per $1k
+    # Patties: standard burger=2, little=1 -> blended avg ~1.7 per burger order
+    # ~$16 avg ticket -> ~62 orders per $1k -> ~105 patties per $1k
     "patties_per_1k":               105,
     # Split: 55% standard (2 patties), 35% little (1 patty), 10% other
     "standard_burger_pct":          0.55,
@@ -75,11 +75,11 @@ DEFAULT_RATIOS = {
     "hotdog_buns_per_1k":           8,    # matches hot dog count
 
     # ---- DAIRY ----
-    # Cheese slices: ~70% of burgers get cheese, all grilled cheese × 2
+    # Cheese slices: ~70% of burgers get cheese, all grilled cheese x 2
     "cheese_slices_per_1k":         50,
 
     # ---- FRIES ----
-    # Fries ordered with ~85% of meals — measured in pounds of potato
+    # Fries ordered with ~85% of meals - measured in pounds of potato
     # Avg regular fries = ~0.9 lb potato before frying
     "fry_portions_per_1k":          53,   # portions
     "potato_lbs_per_portion":       0.90, # lbs raw potato per portion
@@ -89,7 +89,7 @@ DEFAULT_RATIOS = {
     "grilled_onion_portions_per_1k": 19,
     # Grilled mushrooms: ordered on ~15% of burgers
     "grilled_mushroom_portions_per_1k": 10,
-    # Fresh-cut tomatoes, lettuce, jalapeños — estimated by order volume
+    # Fresh-cut tomatoes, lettuce, jalapenos - estimated by order volume
     "tomato_slices_per_1k":          45,
     "lettuce_portions_per_1k":       45,
 
@@ -231,49 +231,49 @@ async def handle_generate_prep_list(arguments: dict) -> str:
     total_food_cost = patty_cost + bacon_cost + hotdog_cost + potato_cost
 
     lines = [
-        f"FIVE GUYS PREP LIST — {date_str}",
+        f"FIVE GUYS PREP LIST - {date_str}",
         f"  Projected Revenue:  ${projected_revenue:,.0f}  (+{buffer_pct:.0f}% buffer applied)",
         *(["  Notes: " + notes] if notes else []),
         f"",
-        f"━━ PROTEINS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        f"--- PROTEINS -------------------------------------------",
         f"  Beef Patties:       {patties:>5}  ({patty_cases:.1f} cases  ~${patty_cost:,.0f})",
-        f"    ↳ Standard (×2):  {int(standard_orders):>5}  orders → {int(standard_orders*2):>3} patties",
-        f"    ↳ Little (×1):    {int(little_orders):>5}  orders → {int(little_orders):>3} patties",
+        f"  Standard (x2 patties): {int(standard_orders):>5}  orders -> {int(standard_orders*2):>3} patties",
+        f"  Little   (x1 patty):  {int(little_orders):>5}  orders -> {int(little_orders):>3} patties",
         f"  Bacon Strips:       {bacon_strips:>5}  ({bacon_cases:.1f} cases  ~${bacon_cost:,.0f})",
-        f"    ↳ Bacon burgers:  {int(bacon_burgers):>5}  × {r['bacon_strips_per_burger']} strips",
-        f"    ↳ Bacon dogs:     {bacon_dogs:>5}  × {r['bacon_strips_per_dog']} strips",
-        f"    ↳ BLTs:           {blts:>5}  × {r['bacon_strips_per_blt']} strips",
+        f"    Bacon burgers:    {int(bacon_burgers):>5}  x {r['bacon_strips_per_burger']} strips",
+        f"    Bacon dogs:       {bacon_dogs:>5}  x {r['bacon_strips_per_dog']} strips",
+        f"    BLTs:             {blts:>5}  x {r['bacon_strips_per_blt']} strips (6 each)",
         f"  Hot Dogs:           {hot_dogs:>5}  ({hotdog_cases:.1f} cases  ~${hotdog_cost:,.0f})",
-        f"    ↳ Bacon cheese dog:{bacon_dogs:>4}  ({r['bacon_dog_pct']*100:.0f}% with bacon)",
+        f"    Bacon cheese dog: {bacon_dogs:>5}  ({r['bacon_dog_pct']*100:.0f}% with bacon)",
         f"  Grilled Cheese:     {grilled_cheese:>5}",
         f"  Veggie Sandwich:    {veggie:>5}",
         f"  BLT:                {blts:>5}",
         f"",
-        f"━━ BREAD ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        f"--- BREAD ----------------------------------------------",
         f"  Sesame Buns:        {burger_buns:>5}",
         f"  Hot Dog Buns:       {hotdog_buns:>5}",
         f"",
-        f"━━ DAIRY ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        f"--- DAIRY ----------------------------------------------",
         f"  American Cheese:    {cheese_slices:>5}  slices",
         f"",
-        f"━━ FRIES ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        f"--- FRIES ----------------------------------------------",
         f"  Fry Portions:       {fry_portions:>5}",
         f"  Raw Potato:         {potato_lbs:>5.0f}  lbs  ({potato_bags:.1f} bags  ~${potato_cost:,.0f})",
-        f"  Note: Double-fry method — pre-fry 2.5 min, rest 10-15 min, finish 2.5-3 min",
+        f"  Note: Double-fry - pre-fry 2.5 min, rest 10-15 min, finish 2.5-3 min",
         f"",
-        f"━━ ACTIVE TOPPINGS (prep before open) ━━━━━━━━━━",
+        f"--- ACTIVE TOPPINGS (prep before open) ----------------",
         f"  Grilled Onions:     {grilled_onions:>5}  portions",
         f"  Grilled Mushrooms:  {grilled_mushrooms:>5}  portions",
         f"  Tomato Slices:      {tomato_slices:>5}",
         f"  Lettuce:            {lettuce:>5}  portions",
-        f"  Note: Jalapeños, green peppers, pickles — top up from stock, no prep count needed",
+        f"  Jalapenos, green peppers, pickles: top up from stock",
         f"",
-        f"━━ ESTIMATED FOOD COST ━━━━━━━━━━━━━━━━━━━━━━━━",
+        f"--- ESTIMATED FOOD COST --------------------------------",
         f"  Proteins + Fries:  ~${total_food_cost:,.0f}",
         f"  Food cost %:       ~{(total_food_cost/projected_revenue)*100:.1f}%  (target: 28-32%)",
         f"",
-        f"⚠  Bacon split is probabilistic (±20%). Calibrate with update_menu_ratios.",
-        f"   Run get_menu_ratios to see all current ratios.",
+        f"NOTE: Bacon split is probabilistic (+/-20%). Calibrate with update_menu_ratios.",
+        f"Run get_menu_ratios to see all current ratios.",
     ]
     return "\n".join(lines)
 
@@ -324,7 +324,7 @@ async def handle_update_menu_ratios(arguments: dict) -> str:
     old = ratios[ratio_key]
     ratios[ratio_key] = float(value)
     _save_ratios(ratios)
-    return f"Updated {ratio_key}: {old} → {value}"
+    return f"Updated {ratio_key}: {old} -> {value}"
 
 
 # ===========================================================================
