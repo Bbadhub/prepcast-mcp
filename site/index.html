@@ -138,9 +138,29 @@
         <a href="science.html" class="hover:text-gray-900 transition-colors">The Science</a>
         <a href="#pricing" class="hover:text-gray-900 transition-colors">Pricing</a>
       </div>
-      <a href="#contact" class="btn-primary py-2.5 px-6 text-sm">Request Access</a>
+      <div class="flex items-center gap-3">
+        <a href="#contact" class="btn-primary py-2.5 px-6 text-sm hidden md:inline-block">Request Access</a>
+        <button id="menu-toggle" class="md:hidden p-2 rounded-lg border border-gray-200 text-gray-600" onclick="toggleMenu()">
+          <svg id="menu-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+      </div>
+    </div>
+    <!-- Mobile menu -->
+    <div id="mobile-menu" class="hidden md:hidden border-t border-gray-100 bg-white px-6 py-4 flex flex-col gap-4 text-sm font-medium text-gray-600">
+      <a href="#problem" class="hover:text-gray-900" onclick="toggleMenu()">The Problem</a>
+      <a href="#how" class="hover:text-gray-900" onclick="toggleMenu()">How It Works</a>
+      <a href="#demo" class="hover:text-gray-900" onclick="toggleMenu()">See It</a>
+      <a href="science.html" class="hover:text-gray-900">The Science</a>
+      <a href="#pricing" class="hover:text-gray-900" onclick="toggleMenu()">Pricing</a>
+      <a href="#contact" class="btn-primary text-center py-2.5" onclick="toggleMenu()">Request Access</a>
     </div>
   </nav>
+  <script>
+    function toggleMenu() {
+      const m = document.getElementById('mobile-menu');
+      m.classList.toggle('hidden');
+    }
+  </script>
 
   <!-- HERO -->
   <section class="hero-gradient pt-24 pb-20 px-6">
