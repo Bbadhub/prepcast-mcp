@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard - PrepCast</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <style>
+    body { font-family: 'Inter', sans-serif; background: #f8fafc; }
+    .kpi-card { transition: box-shadow 0.2s; }
+    .kpi-card:hover { box-shadow: 0 4px 16px rgba(79,70,229,0.1); }
+    .trend-up { color: #16a34a; }
+    .trend-down { color: #dc2626; }
+    .trend-neutral { color: #6b7280; }
+    .bar-fill { background: #4f46e5; border-radius: 3px; height: 8px; }
+    .bar-track { background: #e5e7eb; border-radius: 3px; height: 8px; }
+    .accuracy-dot-good { background: #16a34a; }
+    .accuracy-dot-ok { background: #d97706; }
+    .accuracy-dot-bad { background: #dc2626; }
+  </style>
+</head>
+<body>
+
+  <!-- Nav -->
+  <nav class="bg-white border-b border-gray-100 sticky top-0 z-10">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
+      <a href="/" class="flex items-center gap-2">
+        <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
+          <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+          </svg>
+        </div>
+        <span class="font-bold text-gray-900">PrepCast</span>
+      </a>
+      <div class="flex items-center gap-4">
+        <span id="userEmail" class="text-sm text-gray-500 hidden sm:block"></span>
+        <span id="trialBadge" class="hidden bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium px-2 py-1 rounded-full"></span>
+        <button onclick="signOut()" class="text-sm text-gray-400 hover:text-gray-600">Sign out</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Auth gate -->
+  <div id="authGate" class="hidden max-w-md mx-auto mt-20 px-4">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
+      <h2 class="text-xl font-bold text-gray-900 mb-2">Sign in to view your dashboard</h2>
+      <p class="text-gray-500 text-sm mb-6">Your forecast accuracy, revenue trends, and event data are waiting.</p>
+      <a href="/login" class="inline-block bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-2.5 rounded-lg transition-colors text-sm">
+        Sign in
+      </a>
+      <p class="mt-3 text-sm text-gray-400">New here? <a href="/signup" class="text-indigo-600 hover:text-indigo-700">Start your free trial</a></p>
+    </div>
+  </div>
+
+  <!-- Main dashboard -->
+  <main id="mainDashboard" class="hidden max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <!-- Header row -->
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900">Performance Dashboard</h1>
+        <p id="locationName" class="text-gray-500 text-sm mt-0.5"></p>
+      </div>
+      <div class="flex items-center gap-2">
+        <div id="tokenPanel" class="hidden">
+          <button onclick="showToken()" class="text-sm bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-medium px-3 py-1.5 rounded-lg transition-colors">
+            View Token
+          </button>
+        </div>
+        <button onclick="loadDashboard()" class="text-sm text-gray-400 hover:text-gray-600 flex items-center gap-1">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+          Refresh
+        </button>
+      </div>
+    </div>
+
+    <!-- Token modal -->
+    <div id="tokenModal" class="hidden fixed inset-0 bg-black bg-opacity-40 z-50 flex items-center justify-center px-4">
+      <div class="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full">
+        <h3 class="font-semibold text-gray-900 mb-3">Your Bearer Token</h3>
+        <div class="flex items-center gap-2 mb-4">
+          <code id="modalToken" class="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono text-gray-800 break-all"></code>
+          <button onclick="copyModalToken()" class="shrink-0 bg-indigo-600 text-white text-xs px-3 py-2 rounded-lg">Copy</button>
+        </div>
+        <div class="bg-blue-50 rounded-xl p-3 text-xs text-blue-700 mb-4">
+          <p class="font-semibold mb-1">Claude Connector setup:</p>
+          <p>claude.ai &rarr; Customize &rarr; Connectors &rarr; Add Custom</p>
+          <p class="mt-1">SSE URL: <code class="bg-blue-100 px-1 rounded" id="modalSseUrl"></code></p>
+          <p class="mt-1">Header: <code class="bg-blue-100 px-1 rounded">Authorization: Bearer &lt;token&gt;</code></p>
+        </div>
+        <button onclick="document.getElementById('tokenModal').classList.add('hidden')" class="w-full border border-gray-200 text-gray-600 text-sm py-2 rounded-lg hover:border-gray-300">
+          Close
+        </button>
+      </div>
+    </div>
+
+    <!-- No data state -->
+    <div id="noDataState" class="hidden bg-white rounded-2xl border border-dashed border-gray-300 p-12 text-center mb-6">
+      <div class="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+        <svg class="w-7 h-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+        </svg>
+      </div>
+      <h3 class="text-lg font-semibold text-gray-700 mb-2">No sales data yet</h3>
+      <p class="text-gray-500 text-sm max-w-sm mx-auto mb-4">
+        Connect PrepCast to Claude, then say: <em>"Upload my sales data"</em> and paste in your CSV spreadsheet.
+        Your dashboard will populate automatically.
+      </p>
+      <div class="bg-gray-50 rounded-xl p-4 text-left max-w-sm mx-auto text-xs text-gray-600">
+        <p class="font-semibold mb-2">Quick start commands in Claude:</p>
+        <ol class="space-y-1 list-decimal list-inside">
+          <li>"Upload my sales CSV data"</li>
+          <li>"Analyze my sales history"</li>
+          <li>"Forecast tomorrow's revenue"</li>
+          <li>"Generate my prep list"</li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- KPI cards -->
+    <div id="kpiCards" class="hidden grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div class="kpi-card bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <p class="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">Daily Avg Revenue</p>
+        <p id="kpiAvgRev" class="text-2xl font-bold text-gray-900">--</p>
+        <p id="kpiAvgRevSub" class="text-xs text-gray-400 mt-1">last 30 days</p>
+      </div>
+      <div class="kpi-card bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <p class="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">Trend vs Prior Month</p>
+        <p id="kpiTrend" class="text-2xl font-bold">--</p>
+        <p id="kpiTrendSub" class="text-xs text-gray-400 mt-1">30d vs prior 30d</p>
+      </div>
+      <div class="kpi-card bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <p class="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">Forecast Accuracy</p>
+        <p id="kpiAccuracy" class="text-2xl font-bold text-gray-900">--</p>
+        <p id="kpiAccuracySub" class="text-xs text-gray-400 mt-1">prediction vs actual</p>
+      </div>
+      <div class="kpi-card bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <p class="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">Days Recorded</p>
+        <p id="kpiDays" class="text-2xl font-bold text-gray-900">--</p>
+        <p id="kpiDaysSub" class="text-xs text-gray-400 mt-1">in history</p>
+      </div>
+    </div>
+
+    <!-- Charts row -->
+    <div id="chartsRow" class="hidden grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+      <!-- Weekly revenue chart -->
+      <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <h3 class="text-sm font-semibold text-gray-700 mb-4">Weekly Revenue (last 12 weeks)</h3>
+        <div class="relative h-48">
+          <canvas id="weeklyChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Day of week averages -->
+      <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <h3 class="text-sm font-semibold text-gray-700 mb-4">Average Revenue by Day of Week</h3>
+        <div id="dowBars" class="space-y-2.5"></div>
+      </div>
+    </div>
+
+    <!-- Forecast accuracy table -->
+    <div id="accuracySection" class="hidden bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-sm font-semibold text-gray-700">Forecast vs Actual</h3>
+        <div class="flex items-center gap-3 text-xs">
+          <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full accuracy-dot-good"></span>Within 5%</span>
+          <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full accuracy-dot-ok"></span>5-15%</span>
+          <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full accuracy-dot-bad"></span>15%+</span>
+        </div>
+      </div>
+      <div id="accuracyTable" class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-xs text-gray-400 border-b border-gray-100">
+              <th class="text-left py-2 font-medium">Date</th>
+              <th class="text-right py-2 font-medium">Forecast</th>
+              <th class="text-right py-2 font-medium">Actual</th>
+              <th class="text-right py-2 font-medium">Error</th>
+              <th class="text-left py-2 pl-4 font-medium">Status</th>
+            </tr>
+          </thead>
+          <tbody id="accuracyBody"></tbody>
+        </table>
+        <p id="noAccuracy" class="hidden text-center text-gray-400 text-xs py-6">
+          No forecast comparisons yet.<br/>Forecasts are compared against actuals once you log daily sales.
+        </p>
+      </div>
+    </div>
+
+    <!-- Event impact -->
+    <div id="eventSection" class="hidden bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6">
+      <h3 class="text-sm font-semibold text-gray-700 mb-4">Event Impact Log</h3>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-xs text-gray-400 border-b border-gray-100">
+              <th class="text-left py-2 font-medium">Date</th>
+              <th class="text-left py-2 font-medium">Event</th>
+              <th class="text-right py-2 font-medium">Baseline</th>
+              <th class="text-right py-2 font-medium">Actual</th>
+              <th class="text-right py-2 font-medium">Lift</th>
+              <th class="text-right py-2 font-medium">Multiplier</th>
+            </tr>
+          </thead>
+          <tbody id="eventBody"></tbody>
+        </table>
+        <p id="noEvents" class="hidden text-center text-gray-400 text-xs py-6">
+          No events logged yet.<br/>Use <em>log_event_outcome</em> in Claude to track event days.
+        </p>
+      </div>
+    </div>
+
+    <!-- Connect strip -->
+    <div class="bg-indigo-50 border border-indigo-100 rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+      <div class="flex-1">
+        <p class="text-sm font-semibold text-indigo-900">Connected to Claude?</p>
+        <p class="text-xs text-indigo-700 mt-0.5">
+          PrepCast works through Claude. Ask it to forecast sales, generate prep lists, or analyze your history.
+        </p>
+      </div>
+      <button onclick="showToken()" class="shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+        Get connection token
+      </button>
+    </div>
+
+  </main>
+
+  <script>
+    const token = sessionStorage.getItem('prepcast_token');
+    const email = sessionStorage.getItem('prepcast_email');
+
+    function fmt(n) {
+      if (n == null) return '--';
+      return '$' + Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 });
+    }
+
+    function signOut() {
+      sessionStorage.removeItem('prepcast_token');
+      sessionStorage.removeItem('prepcast_email');
+      window.location.href = '/login';
+    }
+
+    function showToken() {
+      if (!token) return;
+      document.getElementById('modalToken').textContent = token;
+      document.getElementById('modalSseUrl').textContent = window.location.origin + '/sse';
+      document.getElementById('tokenModal').classList.remove('hidden');
+    }
+
+    function copyModalToken() {
+      navigator.clipboard.writeText(token).then(() => {
+        const btn = document.querySelector('[onclick="copyModalToken()"]');
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+      });
+    }
+
+    let weeklyChart = null;
+
+    async function loadDashboard() {
+      try {
+        const headers = token ? { Authorization: 'Bearer ' + token } : {};
+        const res = await fetch('/api/kpi', { headers });
+        if (!res.ok) throw new Error('Failed to load KPI data');
+        const data = await res.json();
+        renderDashboard(data);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function renderDashboard(data) {
+      const summary = data.summary || {};
+      const accuracy = data.forecast_accuracy || {};
+      const events = data.event_impact || {};
+      const charts = data.charts || {};
+
+      const hasSales = (summary.total_days_recorded || 0) > 0;
+      document.getElementById('noDataState').classList.toggle('hidden', hasSales);
+
+      if (!hasSales) return;
+
+      // KPI cards
+      document.getElementById('kpiCards').classList.remove('hidden');
+      document.getElementById('kpiAvgRev').textContent = fmt(summary.recent_30d_avg);
+      document.getElementById('kpiAvgRevSub').textContent = summary.date_range?.from
+        ? `${summary.date_range.from} to ${summary.date_range.to}`
+        : 'last 30 days';
+
+      const trendPct = summary.trend_pct || 0;
+      const trendEl = document.getElementById('kpiTrend');
+      trendEl.textContent = (trendPct >= 0 ? '+' : '') + trendPct.toFixed(1) + '%';
+      trendEl.className = 'text-2xl font-bold ' + (trendPct > 0 ? 'trend-up' : trendPct < 0 ? 'trend-down' : 'trend-neutral');
+
+      const accPct = accuracy.accuracy_pct;
+      document.getElementById('kpiAccuracy').textContent = accPct != null ? accPct.toFixed(1) + '%' : '--';
+      document.getElementById('kpiAccuracySub').textContent =
+        accuracy.comparisons_available > 0
+          ? `based on ${accuracy.comparisons_available} comparison${accuracy.comparisons_available === 1 ? '' : 's'}`
+          : 'not enough data yet';
+
+      document.getElementById('kpiDays').textContent = summary.total_days_recorded || '--';
+      document.getElementById('kpiDaysSub').textContent = summary.overall_avg_daily_revenue
+        ? fmt(summary.overall_avg_daily_revenue) + ' avg/day overall'
+        : 'in history';
+
+      // Charts
+      document.getElementById('chartsRow').classList.remove('hidden');
+
+      // Weekly revenue chart
+      const weekly = (charts.weekly_revenue || []);
+      if (weekly.length > 0) {
+        const ctx = document.getElementById('weeklyChart').getContext('2d');
+        if (weeklyChart) weeklyChart.destroy();
+        weeklyChart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: weekly.map(w => w.week),
+            datasets: [{
+              label: 'Revenue',
+              data: weekly.map(w => w.revenue),
+              backgroundColor: 'rgba(79, 70, 229, 0.8)',
+              borderRadius: 4,
+              borderSkipped: false,
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              y: {
+                ticks: {
+                  callback: v => '$' + (v / 1000).toFixed(0) + 'k',
+                  font: { size: 11 },
+                },
+                grid: { color: '#f3f4f6' },
+              },
+              x: {
+                ticks: { font: { size: 10 }, maxRotation: 45 },
+                grid: { display: false },
+              }
+            }
+          }
+        });
+      }
+
+      // Day-of-week bars
+      const dow = charts.by_day_of_week || [];
+      const maxRev = dow.length > 0 ? Math.max(...dow.map(d => d.avg_revenue)) : 1;
+      const dowContainer = document.getElementById('dowBars');
+      dowContainer.innerHTML = '';
+      dow.forEach(d => {
+        const pct = maxRev > 0 ? (d.avg_revenue / maxRev * 100) : 0;
+        dowContainer.innerHTML += `
+          <div class="flex items-center gap-2 text-xs">
+            <span class="w-20 text-gray-500 text-right shrink-0">${d.day.slice(0, 3)}</span>
+            <div class="flex-1 bar-track">
+              <div class="bar-fill" style="width:${pct}%"></div>
+            </div>
+            <span class="w-16 text-right text-gray-700 font-medium">${fmt(d.avg_revenue)}</span>
+          </div>`;
+      });
+
+      // Forecast accuracy
+      document.getElementById('accuracySection').classList.remove('hidden');
+      const comparisons = accuracy.recent || [];
+      const accBody = document.getElementById('accuracyBody');
+      accBody.innerHTML = '';
+      if (comparisons.length === 0) {
+        document.getElementById('noAccuracy').classList.remove('hidden');
+      } else {
+        document.getElementById('noAccuracy').classList.add('hidden');
+        comparisons.forEach(r => {
+          const dotColor = r.error_pct <= 5 ? 'accuracy-dot-good' : r.error_pct <= 15 ? 'accuracy-dot-ok' : 'accuracy-dot-bad';
+          const label = r.error_pct <= 5 ? 'On target' : r.error_pct <= 15 ? 'Close' : 'Off';
+          accBody.innerHTML += `
+            <tr class="border-b border-gray-50 hover:bg-gray-50">
+              <td class="py-2.5 text-gray-600">${r.date}</td>
+              <td class="py-2.5 text-right text-gray-500">${fmt(r.projected)}</td>
+              <td class="py-2.5 text-right font-medium text-gray-900">${fmt(r.actual)}</td>
+              <td class="py-2.5 text-right text-gray-600">${r.error_pct}%</td>
+              <td class="py-2.5 pl-4">
+                <span class="inline-flex items-center gap-1 text-xs">
+                  <span class="w-2 h-2 rounded-full ${dotColor}"></span>
+                  ${label}
+                </span>
+              </td>
+            </tr>`;
+        });
+      }
+
+      // Event impact
+      const eventList = events.events || [];
+      if (events.total_events_logged > 0) {
+        document.getElementById('eventSection').classList.remove('hidden');
+        const evBody = document.getElementById('eventBody');
+        evBody.innerHTML = '';
+        if (eventList.length === 0) {
+          document.getElementById('noEvents').classList.remove('hidden');
+        } else {
+          eventList.forEach(e => {
+            const liftColor = e.revenue_lift >= 0 ? 'text-green-600' : 'text-red-600';
+            const liftSign = e.revenue_lift >= 0 ? '+' : '';
+            evBody.innerHTML += `
+              <tr class="border-b border-gray-50 hover:bg-gray-50">
+                <td class="py-2.5 text-gray-600">${e.date}</td>
+                <td class="py-2.5 text-gray-800 max-w-xs truncate">${e.event}</td>
+                <td class="py-2.5 text-right text-gray-500">${fmt(e.baseline)}</td>
+                <td class="py-2.5 text-right font-medium text-gray-900">${fmt(e.actual)}</td>
+                <td class="py-2.5 text-right ${liftColor} font-medium">${liftSign}${fmt(e.revenue_lift)}</td>
+                <td class="py-2.5 text-right text-gray-600">${e.multiplier}x</td>
+              </tr>`;
+          });
+        }
+      }
+    }
+
+    // Init
+    if (!token) {
+      document.getElementById('authGate').classList.remove('hidden');
+    } else {
+      document.getElementById('mainDashboard').classList.remove('hidden');
+      document.getElementById('tokenPanel').classList.remove('hidden');
+      if (email) document.getElementById('userEmail').textContent = email;
+
+      // Check trial status
+      fetch('/auth/me', { headers: { Authorization: 'Bearer ' + token } })
+        .then(r => r.json())
+        .then(data => {
+          if (data.location_name) {
+            document.getElementById('locationName').textContent = data.location_name;
+          }
+          if (data.trial_active && data.trial_days_remaining > 0) {
+            const badge = document.getElementById('trialBadge');
+            badge.textContent = data.trial_days_remaining + ' trial days left';
+            badge.classList.remove('hidden');
+          }
+        })
+        .catch(() => {});
+
+      loadDashboard();
+    }
+  </script>
+</body>
+</html>

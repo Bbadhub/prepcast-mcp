@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Start Free Trial - PrepCast</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen flex items-center justify-center px-4 py-12">
+
+  <div class="w-full max-w-md">
+    <!-- Logo -->
+    <div class="text-center mb-8">
+      <a href="/" class="inline-flex items-center gap-2">
+        <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+          </svg>
+        </div>
+        <span class="text-xl font-bold text-gray-900">PrepCast</span>
+      </a>
+      <h1 class="mt-4 text-2xl font-bold text-gray-900">Start your free trial</h1>
+      <p class="text-gray-500 text-sm mt-1">14 days free &mdash; no credit card required</p>
+    </div>
+
+    <!-- Card -->
+    <div id="signupCard" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+      <form id="signupForm" class="space-y-5">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Your name</label>
+          <input type="text" id="name" placeholder="Jane Smith"
+            class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Work email</label>
+          <input type="email" id="email" required placeholder="you@example.com"
+            class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Location name</label>
+          <input type="text" id="location_name" placeholder="Five Guys Overland Park 163rd"
+            class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+          <input type="password" id="password" required placeholder="At least 6 characters"
+            class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+        </div>
+
+        <div id="errorMsg" class="hidden bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3"></div>
+
+        <button type="submit" id="submitBtn"
+          class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors text-sm">
+          Start free trial
+        </button>
+
+        <p class="text-xs text-center text-gray-400">
+          No credit card required. Cancel anytime. $100/mo after trial ends.
+        </p>
+      </form>
+
+      <div class="mt-6 text-center text-sm text-gray-500">
+        Already have an account?
+        <a href="/login" class="text-indigo-600 font-medium hover:text-indigo-700">Sign in</a>
+      </div>
+    </div>
+
+    <!-- Success panel (shown after signup) -->
+    <div id="successPanel" class="hidden bg-white rounded-2xl shadow-sm border border-green-100 p-8">
+      <div class="text-center mb-6">
+        <div class="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+          <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+          </svg>
+        </div>
+        <h2 class="text-xl font-bold text-gray-900">You're in!</h2>
+        <p class="text-gray-500 text-sm mt-1">Your 14-day free trial has started.</p>
+      </div>
+
+      <!-- Bearer token -->
+      <div class="mb-5">
+        <p class="text-xs text-gray-500 mb-1 uppercase tracking-wide font-semibold">Your Bearer Token</p>
+        <div class="flex items-center gap-2">
+          <code id="tokenDisplay" class="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono text-gray-800 break-all"></code>
+          <button onclick="copyToken()" class="shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-2 rounded-lg transition-colors font-medium whitespace-nowrap">
+            Copy
+          </button>
+        </div>
+        <p class="text-xs text-gray-500 mt-2">Save this token &mdash; you'll use it to connect Claude to PrepCast.</p>
+      </div>
+
+      <!-- Connect instructions -->
+      <div class="bg-indigo-50 rounded-xl p-4 text-sm mb-5">
+        <p class="font-semibold text-indigo-800 mb-2">Connect to Claude</p>
+        <ol class="text-indigo-700 space-y-1 text-xs list-decimal list-inside">
+          <li>Go to <strong>claude.ai</strong></li>
+          <li>Click <strong>Customize</strong> (bottom left)</li>
+          <li>Click <strong>Connectors</strong> &rarr; <strong>Add Custom</strong></li>
+          <li>Paste this SSE URL:</li>
+        </ol>
+        <div class="mt-2 bg-white rounded-lg px-3 py-2 border border-indigo-200 flex items-center gap-2">
+          <code id="sseUrl" class="text-xs font-mono text-gray-800 flex-1"></code>
+          <button onclick="copySse()" class="text-xs text-indigo-600 font-medium hover:text-indigo-700 whitespace-nowrap">Copy</button>
+        </div>
+        <p class="text-xs text-indigo-600 mt-2">
+          5. In the connector settings, add header:<br/>
+          <code class="bg-indigo-100 px-1 rounded">Authorization: Bearer &lt;your_token&gt;</code>
+        </p>
+      </div>
+
+      <!-- Next steps -->
+      <div class="bg-gray-50 rounded-xl p-4 text-xs text-gray-600 mb-5">
+        <p class="font-semibold text-gray-700 mb-2">Next steps in Claude:</p>
+        <ol class="space-y-1 list-decimal list-inside">
+          <li>Say: <em>"Upload my sales data"</em> and paste your CSV</li>
+          <li>Say: <em>"Analyze my sales history"</em></li>
+          <li>Say: <em>"Forecast Saturday's revenue"</em></li>
+          <li>Say: <em>"Generate my prep list for tomorrow"</em></li>
+        </ol>
+      </div>
+
+      <div class="flex gap-3">
+        <a href="/dashboard" id="dashboardLink"
+          class="flex-1 text-center bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold py-2.5 rounded-lg transition-colors">
+          Open Dashboard
+        </a>
+        <a href="/login"
+          class="flex-1 text-center border border-gray-200 hover:border-gray-300 text-gray-700 text-sm font-medium py-2.5 rounded-lg transition-colors">
+          Sign in later
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('sseUrl').textContent = window.location.origin + '/sse';
+    let currentToken = '';
+
+    function copyToken() {
+      if (!currentToken) return;
+      navigator.clipboard.writeText(currentToken).then(() => {
+        const btn = document.querySelector('[onclick="copyToken()"]');
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+      });
+    }
+
+    function copySse() {
+      const url = window.location.origin + '/sse';
+      navigator.clipboard.writeText(url).then(() => {
+        const btn = document.querySelector('[onclick="copySse()"]');
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+      });
+    }
+
+    document.getElementById('signupForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('submitBtn');
+      const errEl = document.getElementById('errorMsg');
+      errEl.classList.add('hidden');
+      btn.textContent = 'Creating account...';
+      btn.disabled = true;
+
+      try {
+        const res = await fetch('/auth/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: document.getElementById('email').value,
+            password: document.getElementById('password').value,
+            name: document.getElementById('name').value,
+            location_name: document.getElementById('location_name').value,
+          }),
+        });
+        const data = await res.json();
+
+        if (!res.ok || data.error) {
+          errEl.textContent = data.error || 'Signup failed';
+          errEl.classList.remove('hidden');
+          btn.textContent = 'Start free trial';
+          btn.disabled = false;
+          return;
+        }
+
+        currentToken = data.bearer_token;
+        sessionStorage.setItem('prepcast_token', data.bearer_token);
+        sessionStorage.setItem('prepcast_email', data.email);
+
+        document.getElementById('tokenDisplay').textContent = data.bearer_token;
+        document.getElementById('signupCard').classList.add('hidden');
+        document.getElementById('successPanel').classList.remove('hidden');
+      } catch (err) {
+        errEl.textContent = 'Connection error. Please try again.';
+        errEl.classList.remove('hidden');
+        btn.textContent = 'Start free trial';
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

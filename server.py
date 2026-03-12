@@ -31,6 +31,8 @@ from billing import UsageTracker, BillingConfig, create_billing_middleware, add_
 from tools import ALL_TOOLS, ALL_HANDLERS
 from middleware.sync import get_sync_engine
 from middleware.session_manager import get_session_manager
+from auth import add_auth_routes
+from reporting import add_reporting_routes
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -454,6 +456,42 @@ def create_app() -> web.Application:
 
     # Billing management routes (/billing/*)
     add_billing_routes(app, usage_tracker)
+
+    # Auth routes (/auth/*)
+    add_auth_routes(app, usage_tracker)
+
+    # KPI reporting routes (/api/kpi/*)
+    add_reporting_routes(app)
+
+    # Dashboard page
+    async def handle_dashboard(_: web.Request) -> web.StreamResponse:
+        dashboard_path = site_dir / "dashboard.html"
+        if dashboard_path.exists():
+            return web.FileResponse(dashboard_path)
+        return web.Response(status=404, text="Dashboard not found")
+
+    app.router.add_get("/dashboard", handle_dashboard)
+    app.router.add_get("/dashboard.html", handle_dashboard)
+
+    # Login page
+    async def handle_login_page(_: web.Request) -> web.StreamResponse:
+        login_path = site_dir / "login.html"
+        if login_path.exists():
+            return web.FileResponse(login_path)
+        return web.Response(status=404, text="Login page not found")
+
+    app.router.add_get("/login", handle_login_page)
+    app.router.add_get("/login.html", handle_login_page)
+
+    # Signup page
+    async def handle_signup_page(_: web.Request) -> web.StreamResponse:
+        signup_path = site_dir / "signup.html"
+        if signup_path.exists():
+            return web.FileResponse(signup_path)
+        return web.Response(status=404, text="Signup page not found")
+
+    app.router.add_get("/signup", handle_signup_page)
+    app.router.add_get("/signup.html", handle_signup_page)
 
     # CORS middleware for browser clients
     @web.middleware
