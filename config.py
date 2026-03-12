@@ -49,7 +49,7 @@ class ServerConfig:
         Custom fields should use your own prefix convention.
         """
         return cls(
-            port=int(os.environ.get("SERVER_PORT", "8420")),
+            port=int(os.environ.get("PORT", os.environ.get("SERVER_PORT", "8420"))),
             host=os.environ.get("SERVER_HOST", "0.0.0.0"),
             auth_token=os.environ.get("SERVER_AUTH_TOKEN", ""),
             transport=os.environ.get("SERVER_TRANSPORT", "sse"),
