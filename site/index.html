@@ -6,56 +6,28 @@
   <title>PrepCast — AI Prep Forecasting for Restaurants</title>
   <meta name="description" content="Stop guessing your prep. PrepCast uses your sales history and local events to predict what you need — every single day." />
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
-            mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
-          },
-          colors: {
-            brand: {
-              50:  '#fff7ed',
-              100: '#ffedd5',
-              400: '#fb923c',
-              500: '#f97316',
-              600: '#ea580c',
-              700: '#c2410c',
-            }
-          }
-        },
-      },
-    };
-  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
     * { box-sizing: border-box; }
-    body { font-family: 'Inter', system-ui, sans-serif; background: #0a0a0a; color: #f4f4f5; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: #f9fafb; color: #111827; }
 
     .gradient-text {
-      background: linear-gradient(135deg, #f97316, #fb923c, #fbbf24);
+      background: linear-gradient(135deg, #f97316, #ea580c);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
     }
 
     .card {
-      background: #111827;
-      border: 1px solid #1f2937;
-      border-radius: 0.75rem;
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 0.875rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
     }
-
-    .card-hover {
-      transition: border-color 0.2s, transform 0.2s;
-    }
-    .card-hover:hover {
-      border-color: #f97316;
-      transform: translateY(-2px);
-    }
+    .card-hover { transition: border-color 0.2s, box-shadow 0.2s; }
+    .card-hover:hover { border-color: #f97316; box-shadow: 0 4px 16px rgba(249,115,22,0.1); }
 
     .btn-primary {
       background: linear-gradient(135deg, #ea580c, #f97316);
@@ -67,71 +39,73 @@
       display: inline-block;
       text-decoration: none;
     }
-    .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn-primary:hover { opacity: 0.92; transform: translateY(-1px); }
 
     .btn-ghost {
-      border: 1px solid #374151;
-      color: #d1d5db;
+      border: 1.5px solid #d1d5db;
+      color: #374151;
       font-weight: 500;
       padding: 0.75rem 2rem;
       border-radius: 0.5rem;
-      transition: border-color 0.2s;
+      transition: border-color 0.2s, color 0.2s;
       display: inline-block;
       text-decoration: none;
+      background: white;
     }
-    .btn-ghost:hover { border-color: #f97316; color: #f97316; }
+    .btn-ghost:hover { border-color: #f97316; color: #ea580c; }
 
     .terminal {
-      background: #0d1117;
-      border: 1px solid #21262d;
+      background: #1e1e2e;
       border-radius: 0.75rem;
       font-family: 'JetBrains Mono', monospace;
-      font-size: 0.85rem;
-      line-height: 1.7;
+      font-size: 0.82rem;
+      line-height: 1.75;
     }
-    .terminal .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
 
     .badge {
-      font-size: 0.72rem;
-      font-weight: 600;
-      padding: 0.2rem 0.6rem;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.2rem 0.65rem;
       border-radius: 9999px;
-      letter-spacing: 0.04em;
+      letter-spacing: 0.05em;
       text-transform: uppercase;
     }
 
-    /* Subtle grid background */
+    nav { background: rgba(255,255,255,0.95); backdrop-filter: blur(12px); }
+
     .hero-bg {
-      background-image:
-        linear-gradient(rgba(249,115,22,0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(249,115,22,0.03) 1px, transparent 1px);
-      background-size: 40px 40px;
+      background: linear-gradient(160deg, #fff7ed 0%, #f9fafb 60%);
     }
 
-    .step-line {
-      position: absolute;
-      left: 1.25rem;
-      top: 2.5rem;
-      bottom: -1rem;
-      width: 2px;
-      background: linear-gradient(to bottom, #f97316, transparent);
+    .claude-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #f3f0ff;
+      border: 1px solid #c4b5fd;
+      color: #6d28d9;
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 0.3rem 0.8rem;
+      border-radius: 9999px;
     }
   </style>
 </head>
 <body class="min-h-screen">
 
   <!-- NAV -->
-  <nav class="border-b border-gray-800 sticky top-0 z-50" style="background: rgba(10,10,10,0.95); backdrop-filter: blur(12px);">
+  <nav class="border-b border-gray-200 sticky top-0 z-50">
     <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
       <div class="flex items-center gap-2">
         <span class="text-2xl">🍔</span>
-        <span class="font-bold text-xl">PrepCast</span>
-        <span class="badge bg-orange-900 text-orange-300 ml-2">Beta</span>
+        <span class="font-bold text-xl text-gray-900">PrepCast</span>
+        <span class="badge bg-orange-100 text-orange-600 ml-2">Beta</span>
       </div>
-      <div class="hidden md:flex items-center gap-8 text-sm text-gray-400">
-        <a href="#how-it-works" class="hover:text-white transition-colors">How it works</a>
-        <a href="#tools" class="hover:text-white transition-colors">Tools</a>
-        <a href="#install" class="hover:text-white transition-colors">Install</a>
+      <div class="hidden md:flex items-center gap-8 text-sm text-gray-500">
+        <a href="#how-it-works" class="hover:text-gray-900 transition-colors">How it works</a>
+        <a href="#tools" class="hover:text-gray-900 transition-colors">Tools</a>
+        <a href="#install" class="hover:text-gray-900 transition-colors">Get started</a>
       </div>
       <a href="#install" class="btn-primary text-sm py-2 px-5">Get Started</a>
     </div>
@@ -140,211 +114,178 @@
   <!-- HERO -->
   <section class="hero-bg py-24 px-6">
     <div class="max-w-4xl mx-auto text-center">
-      <div class="inline-flex items-center gap-2 bg-orange-950 border border-orange-800 text-orange-300 text-sm px-4 py-2 rounded-full mb-8">
-        <span class="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></span>
-        Works with Claude, ChatGPT, and any MCP client
+
+      <div class="claude-chip mb-6">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
+        Works natively with Claude.ai
       </div>
 
-      <h1 class="text-5xl md:text-6xl font-extrabold leading-tight mb-6">
+      <h1 class="text-5xl md:text-6xl font-extrabold leading-tight mb-6 text-gray-900">
         Stop guessing<br/>
         <span class="gradient-text">your daily prep.</span>
       </h1>
 
-      <p class="text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed">
-        PrepCast connects your sales history, local events, and day-of-week patterns
-        to give your manager an accurate prep list every morning — in plain English.
+      <p class="text-xl text-gray-500 max-w-2xl mx-auto mb-10 leading-relaxed">
+        PrepCast connects to Claude. Give it your sales history, tell it about today's events,
+        and get a complete prep list in seconds.
       </p>
 
       <div class="flex flex-wrap gap-4 justify-center mb-16">
         <a href="#install" class="btn-primary text-base">Connect to Claude</a>
-        <a href="https://github.com/Bbadhub/prepcast-mcp" target="_blank" class="btn-ghost text-base">View on GitHub</a>
+        <a href="#how-it-works" class="btn-ghost text-base">See how it works</a>
       </div>
 
       <!-- TERMINAL DEMO -->
-      <div class="terminal p-0 max-w-2xl mx-auto text-left shadow-2xl">
-        <div class="flex items-center gap-2 px-4 py-3 border-b border-gray-800">
-          <div class="dot bg-red-500"></div>
-          <div class="dot bg-yellow-500"></div>
-          <div class="dot bg-green-500"></div>
-          <span class="text-gray-500 text-xs ml-2">Claude — PrepCast</span>
+      <div class="terminal p-0 max-w-2xl mx-auto text-left shadow-xl">
+        <div class="flex items-center gap-2 px-4 py-3 border-b border-gray-700">
+          <div class="dot bg-red-400"></div>
+          <div class="dot bg-yellow-400"></div>
+          <div class="dot bg-green-400"></div>
+          <span class="text-gray-500 text-xs ml-2 font-mono">Claude — PrepCast</span>
         </div>
-        <div class="p-5 space-y-3">
-          <p><span class="text-gray-500">you → </span><span class="text-white">What's my prep for Saturday? We've got a volleyball tournament at Blue Hawk, about 6,000 people.</span></p>
-          <p class="text-gray-500">─────────────────────────────</p>
-          <p><span class="text-orange-400">PrepCast → </span></p>
-          <p class="text-green-400">SALES FORECAST — Saturday, Mar 14</p>
-          <p class="text-gray-300">  Projected Revenue:  <span class="text-white font-semibold">$7,420</span></p>
-          <p class="text-gray-300">  Confidence Range:   <span class="text-white">$6,500 – $8,340</span></p>
-          <p class="text-gray-300">  Volleyball 6k attn: <span class="text-orange-400">1.45x multiplier</span></p>
-          <p class="text-gray-500 mt-2">─────────────────────────────</p>
-          <p class="text-green-400">PREP LIST (+15% event buffer)</p>
-          <p class="text-gray-300">  Burger Patties:  <span class="text-white font-semibold">238</span>  (3.0 cases ~$1,500)</p>
-          <p class="text-gray-300">  Bacon Strips:    <span class="text-white font-semibold">330</span>  (40% bacon burger est.)</p>
-          <p class="text-gray-300">  Hot Dogs:        <span class="text-white font-semibold">158</span></p>
-          <p class="text-gray-300">  Grilled Cheese:  <span class="text-white font-semibold">105</span></p>
-          <p class="text-gray-300">  Burger Buns:     <span class="text-white font-semibold">238</span></p>
-          <p class="text-gray-300">  Cheese Slices:   <span class="text-white font-semibold">298</span></p>
+        <div class="p-5 space-y-2 text-sm">
+          <p><span class="text-gray-500">you  → </span><span class="text-white">Saturday volleyball tournament at Blue Hawk, 6,000 people. What's my prep?</span></p>
+          <div class="border-t border-gray-700 my-3"></div>
+          <p><span class="text-orange-400 font-semibold">PrepCast → </span></p>
+          <p class="text-green-400 font-mono">FORECAST — Saturday Mar 14</p>
+          <p class="text-gray-300 font-mono">  Revenue:   <span class="text-white font-bold">$7,420</span>  (range $6,500–$8,340)</p>
+          <p class="text-gray-300 font-mono">  Event:     volleyball 6k → <span class="text-orange-400">1.45x</span></p>
+          <div class="border-t border-gray-700 my-3"></div>
+          <p class="text-green-400 font-mono">PREP LIST  (+15% buffer)</p>
+          <p class="text-gray-300 font-mono">  Patties    <span class="text-white font-bold">238</span>  · 3 cases · ~$1,500</p>
+          <p class="text-gray-300 font-mono">  Bacon      <span class="text-white font-bold">330</span>  · 40% bacon burger est.</p>
+          <p class="text-gray-300 font-mono">  Hot Dogs   <span class="text-white font-bold">158</span></p>
+          <p class="text-gray-300 font-mono">  Grld Chse  <span class="text-white font-bold">105</span></p>
+          <p class="text-gray-300 font-mono">  Buns       <span class="text-white font-bold">238</span>  · Cheese <span class="text-white font-bold">298</span></p>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- STATS BAR -->
-  <section class="border-y border-gray-800 py-10 px-6" style="background: #0f0f0f;">
+  <!-- STATS -->
+  <section class="bg-white border-y border-gray-200 py-10 px-6">
     <div class="max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
       <div>
-        <div class="text-3xl font-bold text-white">12</div>
-        <div class="text-sm text-gray-500 mt-1">AI tools included</div>
+        <div class="text-3xl font-bold text-gray-900">14</div>
+        <div class="text-sm text-gray-500 mt-1">AI tools</div>
       </div>
       <div>
-        <div class="text-3xl font-bold text-white">±8%</div>
-        <div class="text-sm text-gray-500 mt-1">avg forecast accuracy</div>
+        <div class="text-3xl font-bold text-gray-900">±8%</div>
+        <div class="text-sm text-gray-500 mt-1">forecast accuracy</div>
       </div>
       <div>
-        <div class="text-3xl font-bold text-white">60s</div>
-        <div class="text-sm text-gray-500 mt-1">daily prep list</div>
+        <div class="text-3xl font-bold text-gray-900">&lt;60s</div>
+        <div class="text-sm text-gray-500 mt-1">to a prep list</div>
       </div>
       <div>
-        <div class="text-3xl font-bold text-white">$0</div>
+        <div class="text-3xl font-bold text-gray-900">Free</div>
         <div class="text-sm text-gray-500 mt-1">to get started</div>
       </div>
     </div>
   </section>
 
   <!-- HOW IT WORKS -->
-  <section id="how-it-works" class="py-24 px-6">
+  <section id="how-it-works" class="py-24 px-6 bg-gray-50">
     <div class="max-w-4xl mx-auto">
       <div class="text-center mb-16">
-        <h2 class="text-4xl font-bold mb-4">How it works</h2>
-        <p class="text-gray-400 text-lg">Three steps. No POS integration required.</p>
+        <h2 class="text-4xl font-bold mb-4 text-gray-900">How it works</h2>
+        <p class="text-gray-500 text-lg">Three steps. No POS integration. Just Claude.</p>
       </div>
 
-      <div class="space-y-8 max-w-2xl mx-auto">
-        <!-- Step 1 -->
-        <div class="flex gap-6 relative">
-          <div class="flex-shrink-0 relative">
-            <div class="w-10 h-10 rounded-full bg-orange-600 flex items-center justify-center font-bold text-white">1</div>
-            <div class="step-line"></div>
-          </div>
-          <div class="card p-6 flex-1">
-            <h3 class="font-semibold text-white text-lg mb-2">Upload your sales history</h3>
-            <p class="text-gray-400 text-sm leading-relaxed">Paste your existing spreadsheet — CSV, tab-separated, or just "date: amount" lines. PrepCast auto-detects the columns and builds your baseline.</p>
-            <div class="terminal mt-4 p-3 text-xs text-gray-400">
-              <span class="text-blue-400">you: </span>upload_sales_csv "Date,Revenue\n01/06/2026,$6240\n01/07/2026,$4100..."
-            </div>
-          </div>
+      <div class="grid md:grid-cols-3 gap-6">
+        <div class="card p-6">
+          <div class="w-10 h-10 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center font-bold text-lg mb-4">1</div>
+          <h3 class="font-semibold text-gray-900 text-lg mb-2">Upload your history</h3>
+          <p class="text-gray-500 text-sm leading-relaxed">Paste your existing daily sales spreadsheet into Claude. PrepCast reads any format — CSV, tab-separated, or even just date/amount lines.</p>
         </div>
-
-        <!-- Step 2 -->
-        <div class="flex gap-6 relative">
-          <div class="flex-shrink-0 relative">
-            <div class="w-10 h-10 rounded-full bg-orange-600 flex items-center justify-center font-bold text-white">2</div>
-            <div class="step-line"></div>
-          </div>
-          <div class="card p-6 flex-1">
-            <h3 class="font-semibold text-white text-lg mb-2">Ask for your forecast</h3>
-            <p class="text-gray-400 text-sm leading-relaxed">Tell Claude what day it is and any events nearby. PrepCast looks at your day-of-week baseline, recent trend, and event multiplier to project revenue.</p>
-            <div class="terminal mt-4 p-3 text-xs text-gray-400">
-              <span class="text-blue-400">you: </span>forecast_sales for Saturday, volleyball tournament 6000 people
-            </div>
-          </div>
+        <div class="card p-6">
+          <div class="w-10 h-10 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center font-bold text-lg mb-4">2</div>
+          <h3 class="font-semibold text-gray-900 text-lg mb-2">Tell it about today</h3>
+          <p class="text-gray-500 text-sm leading-relaxed">Just say it in plain English — "volleyball tournament, 6,000 people." PrepCast factors in day-of-week baselines, recent trends, and event multipliers.</p>
         </div>
-
-        <!-- Step 3 -->
-        <div class="flex gap-6">
-          <div class="flex-shrink-0">
-            <div class="w-10 h-10 rounded-full bg-orange-600 flex items-center justify-center font-bold text-white">3</div>
-          </div>
-          <div class="card p-6 flex-1">
-            <h3 class="font-semibold text-white text-lg mb-2">Get your prep list</h3>
-            <p class="text-gray-400 text-sm leading-relaxed">Run generate_prep_list with the projection. Every item — patties, bacon, buns, hot dogs, grilled cheese — with quantities and case counts. Log actuals at end of day and the model gets smarter.</p>
-            <div class="terminal mt-4 p-3 text-xs text-gray-400">
-              <span class="text-blue-400">you: </span>generate_prep_list projected_revenue=7420 buffer_pct=15
-            </div>
-          </div>
+        <div class="card p-6">
+          <div class="w-10 h-10 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center font-bold text-lg mb-4">3</div>
+          <h3 class="font-semibold text-gray-900 text-lg mb-2">Get your prep list</h3>
+          <p class="text-gray-500 text-sm leading-relaxed">Every item with exact quantities and case counts. Log your actuals at end of day and the model gets more accurate over time.</p>
         </div>
       </div>
     </div>
   </section>
 
   <!-- TOOLS -->
-  <section id="tools" class="py-24 px-6" style="background: #0f0f0f;">
+  <section id="tools" class="py-24 px-6 bg-white">
     <div class="max-w-5xl mx-auto">
       <div class="text-center mb-16">
-        <h2 class="text-4xl font-bold mb-4">All 12 tools</h2>
-        <p class="text-gray-400 text-lg">Each one does exactly one thing. Nothing bloated.</p>
+        <h2 class="text-4xl font-bold mb-4 text-gray-900">14 tools, one goal</h2>
+        <p class="text-gray-500 text-lg">Each tool does exactly one thing. Ask Claude to run any of them.</p>
       </div>
 
-      <div class="grid md:grid-cols-2 gap-4">
+      <div class="grid md:grid-cols-2 gap-8">
 
-        <!-- Sales -->
         <div>
-          <div class="text-xs font-semibold text-orange-400 uppercase tracking-widest mb-3 px-1">Sales Data</div>
+          <div class="text-xs font-bold text-orange-500 uppercase tracking-widest mb-3">Sales Data</div>
           <div class="space-y-2">
-            <div class="card card-hover p-4 flex gap-4">
-              <span class="text-orange-400 font-mono text-sm w-40 flex-shrink-0">upload_sales_csv</span>
-              <span class="text-gray-400 text-sm">Import historical spreadsheets. Auto-detects columns.</span>
+            <div class="card card-hover p-4 flex gap-4 items-start">
+              <code class="text-orange-600 text-xs bg-orange-50 px-2 py-1 rounded font-mono whitespace-nowrap">upload_sales_csv</code>
+              <span class="text-gray-500 text-sm">Paste your spreadsheet. Auto-detects date + revenue columns.</span>
             </div>
-            <div class="card card-hover p-4 flex gap-4">
-              <span class="text-orange-400 font-mono text-sm w-40 flex-shrink-0">log_daily_sales</span>
-              <span class="text-gray-400 text-sm">Log today's actual revenue at end of day.</span>
+            <div class="card card-hover p-4 flex gap-4 items-start">
+              <code class="text-orange-600 text-xs bg-orange-50 px-2 py-1 rounded font-mono whitespace-nowrap">log_daily_sales</code>
+              <span class="text-gray-500 text-sm">Log today's actual revenue at end of shift.</span>
             </div>
-            <div class="card card-hover p-4 flex gap-4">
-              <span class="text-orange-400 font-mono text-sm w-40 flex-shrink-0">get_sales_summary</span>
-              <span class="text-gray-400 text-sm">How much history is loaded, date range, averages.</span>
+            <div class="card card-hover p-4 flex gap-4 items-start">
+              <code class="text-orange-600 text-xs bg-orange-50 px-2 py-1 rounded font-mono whitespace-nowrap">get_sales_summary</code>
+              <span class="text-gray-500 text-sm">How much history is loaded, date range, daily averages.</span>
             </div>
           </div>
         </div>
 
-        <!-- Forecast -->
         <div>
-          <div class="text-xs font-semibold text-orange-400 uppercase tracking-widest mb-3 px-1">Forecasting</div>
+          <div class="text-xs font-bold text-orange-500 uppercase tracking-widest mb-3">Forecasting</div>
           <div class="space-y-2">
-            <div class="card card-hover p-4 flex gap-4">
-              <span class="text-orange-400 font-mono text-sm w-40 flex-shrink-0">forecast_sales</span>
-              <span class="text-gray-400 text-sm">Project revenue for any date with event adjustments.</span>
+            <div class="card card-hover p-4 flex gap-4 items-start">
+              <code class="text-orange-600 text-xs bg-orange-50 px-2 py-1 rounded font-mono whitespace-nowrap">forecast_sales</code>
+              <span class="text-gray-500 text-sm">Project revenue for any date with optional event adjustment.</span>
             </div>
-            <div class="card card-hover p-4 flex gap-4">
-              <span class="text-orange-400 font-mono text-sm w-40 flex-shrink-0">analyze_history</span>
-              <span class="text-gray-400 text-sm">Day-of-week patterns, best/worst days, trends.</span>
+            <div class="card card-hover p-4 flex gap-4 items-start">
+              <code class="text-orange-600 text-xs bg-orange-50 px-2 py-1 rounded font-mono whitespace-nowrap">analyze_history</code>
+              <span class="text-gray-500 text-sm">Day-of-week patterns, best/worst days, trend chart.</span>
             </div>
           </div>
         </div>
 
-        <!-- Prep -->
         <div>
-          <div class="text-xs font-semibold text-orange-400 uppercase tracking-widest mb-3 px-1">Prep Lists</div>
+          <div class="text-xs font-bold text-orange-500 uppercase tracking-widest mb-3">Prep Lists</div>
           <div class="space-y-2">
-            <div class="card card-hover p-4 flex gap-4">
-              <span class="text-orange-400 font-mono text-sm w-40 flex-shrink-0">generate_prep_list</span>
-              <span class="text-gray-400 text-sm">Full item quantities from projected revenue + buffer.</span>
+            <div class="card card-hover p-4 flex gap-4 items-start">
+              <code class="text-orange-600 text-xs bg-orange-50 px-2 py-1 rounded font-mono whitespace-nowrap">generate_prep_list</code>
+              <span class="text-gray-500 text-sm">Full item quantities from projected revenue + safety buffer.</span>
             </div>
-            <div class="card card-hover p-4 flex gap-4">
-              <span class="text-orange-400 font-mono text-sm w-40 flex-shrink-0">update_menu_ratios</span>
-              <span class="text-gray-400 text-sm">Calibrate ratios to your store (bacon split, cases, etc.)</span>
+            <div class="card card-hover p-4 flex gap-4 items-start">
+              <code class="text-orange-600 text-xs bg-orange-50 px-2 py-1 rounded font-mono whitespace-nowrap">update_menu_ratios</code>
+              <span class="text-gray-500 text-sm">Tune patty case size, bacon split %, etc. to your store.</span>
             </div>
-            <div class="card card-hover p-4 flex gap-4">
-              <span class="text-orange-400 font-mono text-sm w-40 flex-shrink-0">get_menu_ratios</span>
-              <span class="text-gray-400 text-sm">Review current ratios and adjust.</span>
+            <div class="card card-hover p-4 flex gap-4 items-start">
+              <code class="text-orange-600 text-xs bg-orange-50 px-2 py-1 rounded font-mono whitespace-nowrap">get_menu_ratios</code>
+              <span class="text-gray-500 text-sm">Review and calibrate current prep ratios.</span>
             </div>
           </div>
         </div>
 
-        <!-- Events -->
         <div>
-          <div class="text-xs font-semibold text-orange-400 uppercase tracking-widest mb-3 px-1">Events</div>
+          <div class="text-xs font-bold text-orange-500 uppercase tracking-widest mb-3">Events</div>
           <div class="space-y-2">
-            <div class="card card-hover p-4 flex gap-4">
-              <span class="text-orange-400 font-mono text-sm w-40 flex-shrink-0">get_upcoming_events</span>
-              <span class="text-gray-400 text-sm">Fetch events at nearby venues with traffic multipliers.</span>
+            <div class="card card-hover p-4 flex gap-4 items-start">
+              <code class="text-orange-600 text-xs bg-orange-50 px-2 py-1 rounded font-mono whitespace-nowrap">get_upcoming_events</code>
+              <span class="text-gray-500 text-sm">Fetch nearby venue events with estimated traffic multipliers.</span>
             </div>
-            <div class="card card-hover p-4 flex gap-4">
-              <span class="text-orange-400 font-mono text-sm w-40 flex-shrink-0">log_event_outcome</span>
-              <span class="text-gray-400 text-sm">Record actual sales on event days. Model learns.</span>
+            <div class="card card-hover p-4 flex gap-4 items-start">
+              <code class="text-orange-600 text-xs bg-orange-50 px-2 py-1 rounded font-mono whitespace-nowrap">log_event_outcome</code>
+              <span class="text-gray-500 text-sm">Record actual sales after event days. Model learns your store.</span>
             </div>
-            <div class="card card-hover p-4 flex gap-4">
-              <span class="text-orange-400 font-mono text-sm w-40 flex-shrink-0">get_event_multipliers</span>
-              <span class="text-gray-400 text-sm">See learned multipliers per event type (volleyball, etc.)</span>
+            <div class="card card-hover p-4 flex gap-4 items-start">
+              <code class="text-orange-600 text-xs bg-orange-50 px-2 py-1 rounded font-mono whitespace-nowrap">get_event_multipliers</code>
+              <span class="text-gray-500 text-sm">See learned multipliers — volleyball vs cornhole vs soccer.</span>
             </div>
           </div>
         </div>
@@ -353,126 +294,117 @@
     </div>
   </section>
 
-  <!-- INSTALL -->
-  <section id="install" class="py-24 px-6">
+  <!-- CONNECT -->
+  <section id="install" class="py-24 px-6 bg-gray-50">
     <div class="max-w-3xl mx-auto">
-      <div class="text-center mb-16">
-        <h2 class="text-4xl font-bold mb-4">Get started in 2 minutes</h2>
-        <p class="text-gray-400 text-lg">Add PrepCast to Claude Desktop or any MCP client.</p>
+      <div class="text-center mb-12">
+        <div class="claude-chip mb-6">Works with Claude.ai</div>
+        <h2 class="text-4xl font-bold mb-4 text-gray-900">Connect in 60 seconds</h2>
+        <p class="text-gray-500 text-lg">PrepCast is already live. Add it to Claude with one URL.</p>
       </div>
 
-      <div class="space-y-6">
-
-        <!-- Option 1: Claude Desktop -->
-        <div class="card p-6">
-          <div class="flex items-center gap-3 mb-4">
-            <div class="w-8 h-8 rounded-full bg-orange-600 flex items-center justify-center text-sm font-bold">1</div>
-            <h3 class="font-semibold text-white">Add to Claude Desktop config</h3>
-          </div>
-          <p class="text-gray-400 text-sm mb-4">Open <code class="text-orange-400 bg-gray-900 px-1 rounded">~/Library/Application Support/Claude/claude_desktop_config.json</code> and add:</p>
-          <div class="terminal p-4 text-sm overflow-x-auto">
-            <pre class="text-gray-300">{
-  <span class="text-blue-400">"mcpServers"</span>: {
-    <span class="text-green-400">"prepcast"</span>: {
-      <span class="text-blue-400">"command"</span>: <span class="text-orange-300">"python"</span>,
-      <span class="text-blue-400">"args"</span>: [<span class="text-orange-300">"/path/to/prepcast-mcp/server.py"</span>, <span class="text-orange-300">"--stdio"</span>],
-      <span class="text-blue-400">"env"</span>: {
-        <span class="text-blue-400">"PREPCAST_DATA_DIR"</span>: <span class="text-orange-300">"/path/to/your/data"</span>
-      }
-    }
-  }
-}</pre>
-          </div>
+      <!-- Step 1 -->
+      <div class="card p-6 bg-orange-50 border-orange-200 mb-4">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center text-sm font-bold text-white">1</div>
+          <h3 class="font-semibold text-gray-900">Go to Claude.ai → Settings → Integrations</h3>
+          <span class="badge bg-green-100 text-green-700">Live now</span>
         </div>
-
-        <!-- Option 2: pip install -->
-        <div class="card p-6">
-          <div class="flex items-center gap-3 mb-4">
-            <div class="w-8 h-8 rounded-full bg-orange-600 flex items-center justify-center text-sm font-bold">2</div>
-            <h3 class="font-semibold text-white">Install dependencies</h3>
-          </div>
-          <div class="terminal p-4 text-sm">
-            <p><span class="text-gray-500">$</span> <span class="text-white">git clone https://github.com/Bbadhub/prepcast-mcp</span></p>
-            <p><span class="text-gray-500">$</span> <span class="text-white">cd prepcast-mcp && pip install -r requirements.txt</span></p>
-            <p><span class="text-gray-500">$</span> <span class="text-white">python server.py --stdio</span></p>
-          </div>
+        <p class="text-gray-600 text-sm mb-4">Click <strong>Add Integration</strong> and paste this URL:</p>
+        <div class="terminal p-4 text-base font-mono select-all">
+          <span class="text-orange-300">https://prepcast-mcp.onrender.com/sse</span>
         </div>
-
-        <!-- Option 3: Docker -->
-        <div class="card p-6">
-          <div class="flex items-center gap-3 mb-4">
-            <div class="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-sm font-bold text-gray-400">3</div>
-            <h3 class="font-semibold text-white">Or run with Docker</h3>
-          </div>
-          <div class="terminal p-4 text-sm">
-            <p><span class="text-gray-500">$</span> <span class="text-white">docker-compose up -d</span></p>
-            <p><span class="text-gray-500 text-xs"># SSE server on port 8420</span></p>
-          </div>
-        </div>
-
+        <p class="text-xs text-gray-500 mt-3">That's it. No install, no config file, no code.</p>
       </div>
 
-      <div class="text-center mt-12">
-        <a href="https://github.com/Bbadhub/prepcast-mcp" target="_blank" class="btn-primary">View full docs on GitHub →</a>
+      <!-- Step 2 -->
+      <div class="card p-6 mb-4">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center text-sm font-bold text-white">2</div>
+          <h3 class="font-semibold text-gray-900">Start a new chat in Claude</h3>
+        </div>
+        <p class="text-gray-500 text-sm">PrepCast tools will appear in the tools panel. Just talk to Claude normally:</p>
+        <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mt-3 text-sm text-gray-700 italic">
+          "We have a volleyball tournament Saturday, about 6,000 people. What should I prep?"
+        </div>
       </div>
+
+      <!-- Step 3 -->
+      <div class="card p-6 mb-6">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center text-sm font-bold text-white">3</div>
+          <h3 class="font-semibold text-gray-900">Upload your sales history</h3>
+        </div>
+        <p class="text-gray-500 text-sm">Tell Claude: <em>"I want to upload my sales history"</em> and paste your spreadsheet. After 30+ days of data, forecasts become accurate to your specific location.</p>
+      </div>
+
+      <!-- First 3 things -->
+      <div class="card p-6 border-l-4 border-orange-400">
+        <h3 class="font-semibold text-gray-900 mb-3">First 3 things to say to Claude</h3>
+        <ol class="space-y-3 text-sm text-gray-600">
+          <li class="flex gap-3"><span class="text-orange-500 font-bold shrink-0">1.</span><em>"Show me my current prep ratios"</em> — review defaults, adjust to your store</li>
+          <li class="flex gap-3"><span class="text-orange-500 font-bold shrink-0">2.</span><em>"I want to upload my sales history"</em> — paste your CSV when prompted</li>
+          <li class="flex gap-3"><span class="text-orange-500 font-bold shrink-0">3.</span><em>"What's my prep list for tomorrow? Soccer tournament, 3,000 people."</em></li>
+        </ol>
+      </div>
+
     </div>
   </section>
 
   <!-- WHY -->
-  <section class="py-24 px-6" style="background: #0f0f0f;">
+  <section class="py-24 px-6 bg-white">
     <div class="max-w-4xl mx-auto">
       <div class="text-center mb-16">
-        <h2 class="text-4xl font-bold mb-4">Built for the real world</h2>
-        <p class="text-gray-400 text-lg max-w-2xl mx-auto">Enterprise tools like Crunchtime cost thousands and need full POS integration. Most managers still use hand-written sheets and gut feel. PrepCast is the middle ground.</p>
+        <h2 class="text-4xl font-bold mb-4 text-gray-900">Built for real operations</h2>
+        <p class="text-gray-500 text-lg max-w-2xl mx-auto">Enterprise tools cost thousands and need full POS integration. Most managers still use handwritten sheets. PrepCast is the gap filler.</p>
       </div>
 
       <div class="grid md:grid-cols-3 gap-6">
         <div class="card p-6 text-center">
           <div class="text-4xl mb-4">📋</div>
-          <h3 class="font-semibold text-white mb-2">No POS required</h3>
-          <p class="text-gray-400 text-sm">Just paste your existing spreadsheet. Works with whatever you already have.</p>
+          <h3 class="font-semibold text-gray-900 mb-2">No POS required</h3>
+          <p class="text-gray-500 text-sm">Paste whatever spreadsheet you already have. CSV, Excel export, anything.</p>
         </div>
         <div class="card p-6 text-center">
           <div class="text-4xl mb-4">🏟️</div>
-          <h3 class="font-semibold text-white mb-2">Event-aware</h3>
-          <p class="text-gray-400 text-sm">Knows the difference between a 7,000-person volleyball tournament and a 600-person cornhole match.</p>
+          <h3 class="font-semibold text-gray-900 mb-2">Event-aware</h3>
+          <p class="text-gray-500 text-sm">Knows the difference between a 7,000-person volleyball tournament and a 600-person cornhole match.</p>
         </div>
         <div class="card p-6 text-center">
           <div class="text-4xl mb-4">🧠</div>
-          <h3 class="font-semibold text-white mb-2">Gets smarter</h3>
-          <p class="text-gray-400 text-sm">Log your actuals daily. The model learns your store's specific patterns over time.</p>
+          <h3 class="font-semibold text-gray-900 mb-2">Gets smarter daily</h3>
+          <p class="text-gray-500 text-sm">Log actuals every shift. The model learns your location's specific patterns over time.</p>
         </div>
         <div class="card p-6 text-center">
           <div class="text-4xl mb-4">🔢</div>
-          <h3 class="font-semibold text-white mb-2">Case math built in</h3>
-          <p class="text-gray-400 text-sm">Automatically converts prep quantities to cases and dollar costs. David's $500/case formula built in.</p>
+          <h3 class="font-semibold text-gray-900 mb-2">Case math built in</h3>
+          <p class="text-gray-500 text-sm">Converts prep quantities to cases and dollar costs automatically.</p>
         </div>
         <div class="card p-6 text-center">
           <div class="text-4xl mb-4">🥓</div>
-          <h3 class="font-semibold text-white mb-2">Bacon split solved</h3>
-          <p class="text-gray-400 text-sm">Probabilistic bacon vs cheeseburger split. Calibrates to your store's actual order mix over time.</p>
+          <h3 class="font-semibold text-gray-900 mb-2">Bacon split solved</h3>
+          <p class="text-gray-500 text-sm">Probabilistic cheeseburger vs bacon burger split that calibrates to your actual order mix.</p>
         </div>
         <div class="card p-6 text-center">
           <div class="text-4xl mb-4">🔓</div>
-          <h3 class="font-semibold text-white mb-2">Open source</h3>
-          <p class="text-gray-400 text-sm">MIT licensed. Run it on your own server. No subscription, no lock-in.</p>
+          <h3 class="font-semibold text-gray-900 mb-2">Open source</h3>
+          <p class="text-gray-500 text-sm">MIT licensed. Run it on your own server. No subscription, no lock-in.</p>
         </div>
       </div>
     </div>
   </section>
 
   <!-- FOOTER -->
-  <footer class="border-t border-gray-800 py-12 px-6">
+  <footer class="border-t border-gray-200 py-10 px-6 bg-gray-50">
     <div class="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
       <div class="flex items-center gap-2">
         <span class="text-xl">🍔</span>
-        <span class="font-bold text-white">PrepCast</span>
-        <span class="text-gray-600 text-sm ml-2">AI prep forecasting for restaurants</span>
+        <span class="font-bold text-gray-900">PrepCast</span>
+        <span class="text-gray-400 text-sm ml-2">AI prep forecasting for restaurants</span>
       </div>
-      <div class="flex items-center gap-6 text-sm text-gray-500">
-        <a href="https://github.com/Bbadhub/prepcast-mcp" target="_blank" class="hover:text-white transition-colors">GitHub</a>
-        <a href="https://github.com/Bbadhub/prepcast-mcp/issues" target="_blank" class="hover:text-white transition-colors">Issues</a>
-        <span>MIT License</span>
+      <div class="flex items-center gap-6 text-sm text-gray-400">
+        <a href="mailto:hello@prepcast.ai" class="hover:text-gray-900 transition-colors">Contact</a>
+        <span>© 2026 PrepCast</span>
       </div>
     </div>
   </footer>
