@@ -1,0 +1,46 @@
+version: "3.8"
+
+services:
+  # --------------------------------------------------------------------------
+  # MCP Server
+  # --------------------------------------------------------------------------
+  mcp-server:
+    build: .
+    container_name: {{SERVER_NAME}}
+    restart: unless-stopped
+    ports:
+      - "${SERVER_PORT:-{{SERVER_PORT}}}:{{SERVER_PORT}}"
+    env_file:
+      - .env
+    volumes:
+      - mcp-data:/data/usage
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:{{SERVER_PORT}}/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # --------------------------------------------------------------------------
+  # Caddy (reverse proxy + auto-TLS) - enable with: docker compose --profile proxy up
+  # --------------------------------------------------------------------------
+  caddy:
+    image: caddy:2-alpine
+    container_name: {{SERVER_NAME}}-caddy
+    restart: unless-stopped
+    profiles:
+      - proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - mcp-server
+
+volumes:
+  mcp-data:
+  caddy-data:
+  caddy-config:

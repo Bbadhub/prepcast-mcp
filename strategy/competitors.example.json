@@ -1,0 +1,57 @@
+{
+  "our_product": {
+    "name": "{{PROJECT_NAME}}",
+    "positioning": "Outcome-first MCP platform",
+    "public_strength": "Fast deployment, transparent usage controls, and strong operations.",
+    "pricing": {
+      "free_calls": 100,
+      "pro_monthly_usd": 99,
+      "pro_calls": 10000
+    },
+    "scores": {
+      "accuracy": 8.8,
+      "workflow_depth": 9.1,
+      "deployment_speed": 9.2,
+      "consumer_usability": 8.4,
+      "ops_visibility": 9.0
+    }
+  },
+  "competitors": [
+    {
+      "name": "Competitor A",
+      "positioning": "General legal AI platform",
+      "public_strength": "Large searchable corpus and strong brand trust.",
+      "public_gap": "Limited workflow customization for your niche.",
+      "pricing": {
+        "free_calls": 50,
+        "pro_monthly_usd": 129,
+        "pro_calls": 8000
+      },
+      "scores": {
+        "accuracy": 8.6,
+        "workflow_depth": 7.7,
+        "deployment_speed": 7.3,
+        "consumer_usability": 8.9,
+        "ops_visibility": 7.4
+      }
+    },
+    {
+      "name": "Competitor B",
+      "positioning": "Research-only API",
+      "public_strength": "Good APIs and documentation.",
+      "public_gap": "No built-in report workflows or integrated onboarding UX.",
+      "pricing": {
+        "free_calls": 100,
+        "pro_monthly_usd": 99,
+        "pro_calls": 10000
+      },
+      "scores": {
+        "accuracy": 8.1,
+        "workflow_depth": 6.8,
+        "deployment_speed": 8.4,
+        "consumer_usability": 7.6,
+        "ops_visibility": 7.9
+      }
+    }
+  ]
+}

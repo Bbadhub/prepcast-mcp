@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{PROJECT_NAME}} - MCP Server</title>
+  <meta name="description" content="{{PROJECT_DESCRIPTION}}" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+          },
+        },
+      },
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    /* Base resets and utilities */
+    * { box-sizing: border-box; }
+    body { font-family: 'Inter', system-ui, sans-serif; }
+
+    /* Gradient text helper */
+    .gradient-text {
+      background: linear-gradient(135deg, #3b82f6, #6366f1, #8b5cf6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* Gradient border cards */
+    .gradient-border {
+      position: relative;
+      background: #111827;
+      border-radius: 0.75rem;
+    }
+    .gradient-border::before {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      border-radius: 0.75rem;
+      padding: 1px;
+      background: linear-gradient(135deg, #3b82f6, #6366f1);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
+    }
+
+    /* Glow effect on hero CTA */
+    .glow-btn {
+      box-shadow: 0 0 20px rgba(99, 102, 241, 0.4), 0 0 60px rgba(99, 102, 241, 0.1);
+      transition: box-shadow 0.3s ease;
+    }
+    .glow-btn:hover {
+      box-shadow: 0 0 30px rgba(99, 102, 241, 0.6), 0 0 80px rgba(99, 102, 241, 0.2);
+    }
+
+    /* Code block styling */
+    .code-block {
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 0.5rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      line-height: 1.6;
+      overflow-x: auto;
+    }
+    .code-block .line-keyword { color: #ff7b72; }
+    .code-block .line-string { color: #a5d6ff; }
+    .code-block .line-comment { color: #8b949e; }
+    .code-block .line-prop { color: #d2a8ff; }
+    .code-block .line-punct { color: #c9d1d9; }
+
+    /* Pricing card highlight */
+    .pricing-popular {
+      border: 2px solid transparent;
+      background-image: linear-gradient(#111827, #111827),
+                        linear-gradient(135deg, #3b82f6, #6366f1);
+      background-origin: border-box;
+      background-clip: padding-box, border-box;
+    }
+
+    /* Step connector line */
+    .step-connector {
+      position: relative;
+    }
+    .step-connector::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      right: -2rem;
+      width: 4rem;
+      height: 2px;
+      background: linear-gradient(90deg, #3b82f6, #6366f1);
+    }
+
+    /* Toast notification */
+    .toast {
+      animation: slideUp 0.3s ease-out, fadeOut 0.3s ease-in 2.7s;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    @keyframes fadeOut {
+      from { opacity: 1; }
+      to { opacity: 0; }
+    }
+
+    /* Mobile nav */
+    .mobile-nav-open { transform: translateX(0) !important; }
+
+    /* Scroll-triggered fade-in */
+    .fade-in-section {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+    }
+    .fade-in-section.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+
+<body class="bg-gray-900 text-gray-100 antialiased">
+
+  <!-- ========== NAV ========== -->
+  <nav id="nav" class="fixed top-0 left-0 right-0 z-50 bg-gray-900/80 backdrop-blur-md border-b border-gray-800/50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <!-- Logo -->
+        <a href="#" class="flex items-center gap-2 text-lg font-bold">
+          <span class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-sm font-mono">M</span>
+          <span class="gradient-text">{{PROJECT_NAME}}</span>
+        </a>
+
+        <!-- Desktop Links -->
+        <div class="hidden md:flex items-center gap-8">
+          <a href="#features" class="text-sm text-gray-400 hover:text-white transition-colors">Features</a>
+          <a href="#compare" class="text-sm text-gray-400 hover:text-white transition-colors">Compare</a>
+          <a href="#consumer" class="text-sm text-gray-400 hover:text-white transition-colors">Use Online</a>
+          <a href="#affiliates" class="text-sm text-gray-400 hover:text-white transition-colors">Affiliates</a>
+          <a href="#pricing" class="text-sm text-gray-400 hover:text-white transition-colors">Pricing</a>
+          <a href="#docs" class="text-sm text-gray-400 hover:text-white transition-colors">Docs</a>
+          <a href="#get-started" class="text-sm px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 font-medium transition-all">
+            Get API Key
+          </a>
+        </div>
+
+        <!-- Mobile Hamburger -->
+        <button id="mobile-menu-btn" class="md:hidden p-2 text-gray-400 hover:text-white" aria-label="Menu">
+          <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Mobile Menu -->
+    <div id="mobile-menu" class="md:hidden fixed inset-y-0 right-0 w-64 bg-gray-900 border-l border-gray-800 transform translate-x-full transition-transform duration-300 z-50">
+      <div class="p-6 flex flex-col gap-6">
+        <button id="mobile-menu-close" class="self-end p-2 text-gray-400 hover:text-white" aria-label="Close">
+          <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+        <a href="#features" class="text-gray-300 hover:text-white transition-colors mobile-nav-link">Features</a>
+        <a href="#compare" class="text-gray-300 hover:text-white transition-colors mobile-nav-link">Compare</a>
+        <a href="#consumer" class="text-gray-300 hover:text-white transition-colors mobile-nav-link">Use Online</a>
+        <a href="#affiliates" class="text-gray-300 hover:text-white transition-colors mobile-nav-link">Affiliates</a>
+        <a href="#pricing" class="text-gray-300 hover:text-white transition-colors mobile-nav-link">Pricing</a>
+        <a href="#docs" class="text-gray-300 hover:text-white transition-colors mobile-nav-link">Docs</a>
+        <a href="#get-started" class="text-center px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 font-medium mobile-nav-link">
+          Get API Key
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ========== HERO ========== -->
+  <section class="relative pt-32 pb-20 overflow-hidden">
+    <!-- Background decorations -->
+    <div class="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
+      <div class="absolute -top-40 -right-40 w-[600px] h-[600px] rounded-full bg-blue-600/10 blur-3xl"></div>
+      <div class="absolute -bottom-40 -left-40 w-[600px] h-[600px] rounded-full bg-indigo-600/10 blur-3xl"></div>
+    </div>
+
+    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <!-- Badge -->
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-sm font-medium mb-8">
+        <span class="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
+        MCP-Compatible Server
+      </div>
+
+      <!-- Title -->
+      <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight mb-6 max-w-4xl mx-auto">
+        <span class="gradient-text">{{PROJECT_NAME}}</span>
+      </h1>
+
+      <!-- Tagline -->
+      <p class="text-lg sm:text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed">
+        {{HERO_TAGLINE}}
+      </p>
+
+      <!-- CTAs -->
+      <div class="flex flex-col sm:flex-row gap-4 justify-center mb-16">
+        <a href="#get-started" class="glow-btn inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 font-semibold text-base transition-all">
+          Get Your API Key
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+        </a>
+        <a href="#docs" class="inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-lg border border-gray-700 hover:border-gray-600 text-gray-300 hover:text-white font-semibold text-base transition-all">
+          View Documentation
+        </a>
+      </div>
+
+      <!-- Code Snippet: MCP Config -->
+      <div class="max-w-2xl mx-auto text-left">
+        <div class="code-block p-5">
+          <div class="flex items-center gap-2 mb-3 pb-3 border-b border-gray-800">
+            <span class="w-3 h-3 rounded-full bg-red-500/80"></span>
+            <span class="w-3 h-3 rounded-full bg-yellow-500/80"></span>
+            <span class="w-3 h-3 rounded-full bg-green-500/80"></span>
+            <span class="ml-3 text-xs text-gray-500 font-mono">mcp_config.json</span>
+          </div>
+<pre class="text-gray-300"><span class="line-punct">{</span>
+  <span class="line-prop">"mcpServers"</span><span class="line-punct">: {</span>
+    <span class="line-prop">"{{PROJECT_SLUG}}"</span><span class="line-punct">: {</span>
+      <span class="line-prop">"url"</span><span class="line-punct">:</span> <span class="line-string">"{{API_BASE_URL}}/sse"</span><span class="line-punct">,</span>
+      <span class="line-prop">"headers"</span><span class="line-punct">: {</span>
+        <span class="line-prop">"Authorization"</span><span class="line-punct">:</span> <span class="line-string">"Bearer YOUR_API_KEY"</span>
+      <span class="line-punct">}</span>
+    <span class="line-punct">}</span>
+  <span class="line-punct">}</span>
+<span class="line-punct">}</span></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== FEATURES ========== -->
+  <section id="features" class="py-20 fade-in-section">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-16">
+        <h2 class="text-3xl sm:text-4xl font-bold mb-4">
+          Everything you need to <span class="gradient-text">build with AI</span>
+        </h2>
+        <p class="text-gray-400 text-lg max-w-2xl mx-auto">
+          {{PROJECT_DESCRIPTION}}
+        </p>
+      </div>
+      <div id="features-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Populated by JS from FEATURES_JSON -->
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== HOW IT WORKS ========== -->
+  <section class="py-20 bg-gray-800/30 fade-in-section">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-16">
+        <h2 class="text-3xl sm:text-4xl font-bold mb-4">
+          Up and running in <span class="gradient-text">3 steps</span>
+        </h2>
+        <p class="text-gray-400 text-lg">Connect your AI tools in minutes, not hours.</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-12">
+        <!-- Step 1 -->
+        <div class="text-center">
+          <div class="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-2xl font-bold">
+            1
+          </div>
+          <h3 class="text-xl font-semibold mb-3">Get API Key</h3>
+          <p class="text-gray-400 leading-relaxed">
+            Sign up with your email and receive an API key instantly. No credit card required for the free tier.
+          </p>
+        </div>
+        <!-- Step 2 -->
+        <div class="text-center">
+          <div class="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-2xl font-bold">
+            2
+          </div>
+          <h3 class="text-xl font-semibold mb-3">Connect MCP</h3>
+          <p class="text-gray-400 leading-relaxed">
+            Add the server to your MCP config. Works with Claude Desktop, Cursor, Windsurf, and any MCP-compatible client.
+          </p>
+        </div>
+        <!-- Step 3 -->
+        <div class="text-center">
+          <div class="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-2xl font-bold">
+            3
+          </div>
+          <h3 class="text-xl font-semibold mb-3">Start Building</h3>
+          <p class="text-gray-400 leading-relaxed">
+            Your AI assistant can now use all available tools. Ask it to call any tool and it handles the rest.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== COMPETITIVE SNAPSHOT ========== -->
+  <section id="compare" class="py-20 fade-in-section">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-12">
+        <h2 class="text-3xl sm:text-4xl font-bold mb-4">
+          Competitive <span class="gradient-text">snapshot</span>
+        </h2>
+        <p class="text-gray-400 text-lg max-w-3xl mx-auto">
+          We publish outcome-level comparisons so buyers can evaluate fit without exposing internal algorithm details.
+        </p>
+      </div>
+      <div class="gradient-border rounded-xl p-6 md:p-8">
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-left text-sm">
+            <thead class="text-gray-400 border-b border-gray-800">
+              <tr>
+                <th class="py-3 pr-4">Provider</th>
+                <th class="py-3 pr-4">Positioning</th>
+                <th class="py-3 pr-4">Public Strength</th>
+                <th class="py-3 pr-4">Public Gap</th>
+              </tr>
+            </thead>
+            <tbody id="comparison-table-body" class="text-gray-300">
+              <tr class="border-b border-gray-900">
+                <td class="py-3 pr-4">{{PROJECT_NAME}}</td>
+                <td class="py-3 pr-4">Outcome-first MCP platform</td>
+                <td class="py-3 pr-4">Fast setup + transparent usage pricing</td>
+                <td class="py-3 pr-4">Run strategy script to fill live competitor table</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== CONSUMER WEB APP ========== -->
+  <section id="consumer" class="py-20 bg-gray-800/30 fade-in-section">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-12">
+        <h2 class="text-3xl sm:text-4xl font-bold mb-4">
+          Use It In Browser <span class="gradient-text">(No MCP Setup)</span>
+        </h2>
+        <p class="text-gray-400 text-lg max-w-3xl mx-auto">
+          This consumer panel runs your tools over plain HTTP. Great for non-technical users.
+        </p>
+      </div>
+
+      <div class="max-w-4xl mx-auto gradient-border rounded-xl p-6 md:p-8">
+        <form id="consumer-form" class="space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm text-gray-400 mb-2">Tool</label>
+              <select id="consumer-tool-select" class="w-full px-4 py-3 rounded-lg bg-gray-900 border border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none">
+                <option value="echo">echo</option>
+                <option value="hello_world">hello_world</option>
+                <option value="get_status">get_status</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm text-gray-400 mb-2">API Key (optional for free/public endpoints)</label>
+              <input id="consumer-api-key" type="text" placeholder="mcp_xxx..." class="w-full px-4 py-3 rounded-lg bg-gray-900 border border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none" />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm text-gray-400 mb-2">Arguments (JSON)</label>
+            <textarea id="consumer-arguments" rows="6" class="w-full px-4 py-3 rounded-lg bg-gray-900 border border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none font-mono text-sm">{ "text": "Hello from browser" }</textarea>
+          </div>
+
+          <button id="btn-consumer-run" type="submit" class="px-6 py-3 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 font-semibold transition-all">
+            Run Tool
+          </button>
+        </form>
+
+        <div class="mt-6">
+          <p class="text-sm text-gray-400 mb-2">Result</p>
+          <pre id="consumer-output" class="code-block p-4 text-gray-300 whitespace-pre-wrap">Run a tool to see output.</pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== PRICING ========== -->
+  <section id="pricing" class="py-20 fade-in-section">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-16">
+        <h2 class="text-3xl sm:text-4xl font-bold mb-4">
+          Simple, transparent <span class="gradient-text">pricing</span>
+        </h2>
+        <p class="text-gray-400 text-lg max-w-xl mx-auto">Start free. Upgrade when you need more.</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+        <!-- Free Tier -->
+        <div class="gradient-border rounded-xl p-8 flex flex-col">
+          <h3 class="text-lg font-semibold text-gray-300 mb-2">Free</h3>
+          <div class="mb-6">
+            <span class="text-4xl font-extrabold">$0</span>
+            <span class="text-gray-500 ml-1">/month</span>
+          </div>
+          <ul class="space-y-3 mb-8 flex-1">
+            <li class="flex items-start gap-3 text-gray-400">
+              <svg class="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+              <span><strong class="text-gray-200">{{PRICING_FREE_CALLS}}</strong> API calls / month</span>
+            </li>
+            <li class="flex items-start gap-3 text-gray-400">
+              <svg class="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+              <span>All tools included</span>
+            </li>
+            <li class="flex items-start gap-3 text-gray-400">
+              <svg class="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+              <span>Community support</span>
+            </li>
+          </ul>
+          <a href="#get-started" class="block text-center py-3 px-6 rounded-lg border border-gray-700 hover:border-gray-500 text-gray-300 hover:text-white font-medium transition-all">
+            Get Started Free
+          </a>
+        </div>
+
+        <!-- Pro Tier (Popular) -->
+        <div class="pricing-popular rounded-xl p-8 flex flex-col relative">
+          <div class="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-xs font-semibold uppercase tracking-wide">
+            Most Popular
+          </div>
+          <h3 class="text-lg font-semibold text-gray-300 mb-2">Pro</h3>
+          <div class="mb-6">
+            <span class="text-4xl font-extrabold">${{PRICING_PRO_PRICE}}</span>
+            <span class="text-gray-500 ml-1">/month</span>
+          </div>
+          <ul class="space-y-3 mb-8 flex-1">
+            <li class="flex items-start gap-3 text-gray-400">
+              <svg class="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+              <span><strong class="text-gray-200">{{PRICING_PRO_CALLS}}</strong> API calls / month</span>
+            </li>
+            <li class="flex items-start gap-3 text-gray-400">
+              <svg class="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+              <span>Priority rate limits</span>
+            </li>
+            <li class="flex items-start gap-3 text-gray-400">
+              <svg class="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+              <span>Email support</span>
+            </li>
+            <li class="flex items-start gap-3 text-gray-400">
+              <svg class="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+              <span>Usage analytics dashboard</span>
+            </li>
+          </ul>
+          <button id="btn-checkout-pro" class="block w-full text-center py-3 px-6 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 font-medium transition-all cursor-pointer">
+            Upgrade to Pro
+          </button>
+        </div>
+
+        <!-- Enterprise Tier -->
+        <div class="gradient-border rounded-xl p-8 flex flex-col">
+          <h3 class="text-lg font-semibold text-gray-300 mb-2">Enterprise</h3>
+          <div class="mb-6">
+            <span class="text-4xl font-extrabold">Custom</span>
+          </div>
+          <ul class="space-y-3 mb-8 flex-1">
+            <li class="flex items-start gap-3 text-gray-400">
+              <svg class="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+              <span><strong class="text-gray-200">Unlimited</strong> API calls</span>
+            </li>
+            <li class="flex items-start gap-3 text-gray-400">
+              <svg class="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+              <span>Dedicated infrastructure</span>
+            </li>
+            <li class="flex items-start gap-3 text-gray-400">
+              <svg class="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+              <span>SLA and priority support</span>
+            </li>
+            <li class="flex items-start gap-3 text-gray-400">
+              <svg class="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+              <span>Custom integrations</span>
+            </li>
+          </ul>
+          <a href="mailto:sales@{{PROJECT_SLUG}}.com" class="block text-center py-3 px-6 rounded-lg border border-gray-700 hover:border-gray-500 text-gray-300 hover:text-white font-medium transition-all">
+            Contact Sales
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== API DOCS ========== -->
+  <section id="docs" class="py-20 bg-gray-800/30 fade-in-section">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-16">
+        <h2 class="text-3xl sm:text-4xl font-bold mb-4">
+          API <span class="gradient-text">Reference</span>
+        </h2>
+        <p class="text-gray-400 text-lg max-w-2xl mx-auto">
+          Browse available tools and integrate in minutes.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- Tools List -->
+        <div>
+          <h3 class="text-xl font-semibold mb-6 flex items-center gap-2">
+            <svg class="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+            Available Tools
+          </h3>
+          <div id="tools-list" class="space-y-3 max-h-[480px] overflow-y-auto pr-2">
+            <!-- Populated by JS from TOOLS_JSON -->
+          </div>
+        </div>
+
+        <!-- Example Usage -->
+        <div class="space-y-8">
+          <!-- curl Example -->
+          <div>
+            <h3 class="text-xl font-semibold mb-4 flex items-center gap-2">
+              <svg class="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+              Example: curl
+            </h3>
+            <div class="code-block p-4 relative group">
+              <button class="copy-btn absolute top-3 right-3 p-1.5 rounded bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity" data-target="curl-example" title="Copy">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+              </button>
+<pre id="curl-example" class="text-gray-300"><span class="line-keyword">curl</span> -X POST {{API_BASE_URL}}/consumer/run \
+  -H <span class="line-string">"Authorization: Bearer YOUR_API_KEY"</span> \
+  -H <span class="line-string">"Content-Type: application/json"</span> \
+  -d <span class="line-string">'{
+    "tool": "echo",
+    "arguments": { "text": "hello" }
+  }'</span></pre>
+            </div>
+          </div>
+
+          <!-- MCP Config Example -->
+          <div>
+            <h3 class="text-xl font-semibold mb-4 flex items-center gap-2">
+              <svg class="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
+              MCP Client Config
+            </h3>
+            <div class="code-block p-4 relative group">
+              <button class="copy-btn absolute top-3 right-3 p-1.5 rounded bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity" data-target="mcp-config-example" title="Copy">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+              </button>
+<pre id="mcp-config-example" class="text-gray-300"><span class="line-comment">// claude_desktop_config.json</span>
+<span class="line-punct">{</span>
+  <span class="line-prop">"mcpServers"</span><span class="line-punct">: {</span>
+    <span class="line-prop">"{{PROJECT_SLUG}}"</span><span class="line-punct">: {</span>
+      <span class="line-prop">"url"</span><span class="line-punct">:</span> <span class="line-string">"{{API_BASE_URL}}/sse"</span><span class="line-punct">,</span>
+      <span class="line-prop">"headers"</span><span class="line-punct">: {</span>
+        <span class="line-prop">"Authorization"</span><span class="line-punct">:</span> <span class="line-string">"Bearer YOUR_API_KEY"</span>
+      <span class="line-punct">}</span>
+    <span class="line-punct">}</span>
+  <span class="line-punct">}</span>
+<span class="line-punct">}</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== GET STARTED / SIGNUP ========== -->
+  <section id="get-started" class="py-20 fade-in-section">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="max-w-xl mx-auto text-center">
+        <h2 class="text-3xl sm:text-4xl font-bold mb-4">
+          Get your <span class="gradient-text">API key</span>
+        </h2>
+        <p class="text-gray-400 text-lg mb-10">
+          Enter your email to receive an API key instantly. Start making calls in seconds.
+        </p>
+
+        <!-- Signup Form -->
+        <form id="signup-form" class="space-y-4">
+          <div class="flex flex-col sm:flex-row gap-3">
+            <input
+              id="signup-email"
+              type="email"
+              required
+              placeholder="you@example.com"
+              class="flex-1 px-4 py-3 rounded-lg bg-gray-800 border border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-white placeholder-gray-500 outline-none transition-all"
+            />
+            <button
+              type="submit"
+              id="btn-get-key"
+              class="px-6 py-3 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 font-semibold transition-all whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Get API Key
+            </button>
+          </div>
+          <p id="signup-error" class="text-red-400 text-sm hidden"></p>
+        </form>
+
+        <!-- API Key Display (hidden by default) -->
+        <div id="api-key-result" class="mt-8 hidden">
+          <div class="gradient-border rounded-xl p-6 text-left">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="font-semibold text-green-400 flex items-center gap-2">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                Your API Key
+              </h3>
+              <button id="btn-copy-key" class="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                Copy
+              </button>
+            </div>
+            <code id="api-key-value" class="block p-3 rounded bg-gray-950 text-sm font-mono text-blue-300 break-all select-all"></code>
+            <p class="mt-4 text-sm text-gray-500">
+              Save this key securely. You will not be able to see it again.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== AFFILIATE PROGRAM ========== -->
+  <section id="affiliates" class="py-20 bg-gray-800/30 fade-in-section">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="max-w-3xl mx-auto text-center">
+        <h2 class="text-3xl sm:text-4xl font-bold mb-4">
+          Affiliate Program <span class="gradient-text">for Resellers</span>
+        </h2>
+        <p class="text-gray-400 text-lg mb-8">
+          Partner with us, share your referral link, and earn recurring commissions on paid usage.
+        </p>
+      </div>
+
+      <div class="max-w-2xl mx-auto gradient-border rounded-xl p-6">
+        <form id="affiliate-form" class="space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <input id="affiliate-name" type="text" required placeholder="Partner name" class="px-4 py-3 rounded-lg bg-gray-900 border border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none" />
+            <input id="affiliate-email" type="email" required placeholder="payout@email.com" class="px-4 py-3 rounded-lg bg-gray-900 border border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none" />
+          </div>
+          <button id="btn-affiliate-signup" type="submit" class="px-6 py-3 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 font-semibold transition-all">
+            Join Affiliate Program
+          </button>
+          <p id="affiliate-error" class="text-red-400 text-sm hidden"></p>
+        </form>
+
+        <div id="affiliate-result" class="mt-6 hidden">
+          <p class="text-sm text-gray-400 mb-2">Your affiliate code</p>
+          <code id="affiliate-code" class="block p-3 rounded bg-gray-950 text-sm font-mono text-blue-300"></code>
+          <p class="text-sm text-gray-400 mt-3">Share this link</p>
+          <code id="affiliate-url" class="block p-3 rounded bg-gray-950 text-sm font-mono text-green-300 break-all"></code>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== FOOTER ========== -->
+  <footer class="border-t border-gray-800 py-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+        <!-- Brand -->
+        <div class="md:col-span-1">
+          <a href="#" class="flex items-center gap-2 text-lg font-bold mb-3">
+            <span class="w-7 h-7 rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-xs font-mono">M</span>
+            <span class="gradient-text">{{PROJECT_NAME}}</span>
+          </a>
+          <p class="text-gray-500 text-sm leading-relaxed">
+            {{PROJECT_DESCRIPTION}}
+          </p>
+        </div>
+
+        <!-- Product -->
+        <div>
+          <h4 class="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">Product</h4>
+          <ul class="space-y-2">
+            <li><a href="#features" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">Features</a></li>
+            <li><a href="#compare" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">Compare</a></li>
+            <li><a href="#consumer" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">Use Online</a></li>
+            <li><a href="#affiliates" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">Affiliates</a></li>
+            <li><a href="#pricing" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">Pricing</a></li>
+            <li><a href="#docs" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">API Docs</a></li>
+            <li><a href="#get-started" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">Get API Key</a></li>
+          </ul>
+        </div>
+
+        <!-- Resources -->
+        <div>
+          <h4 class="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">Resources</h4>
+          <ul class="space-y-2">
+            <li><a href="https://modelcontextprotocol.io" target="_blank" rel="noopener" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">MCP Specification</a></li>
+            <li><a href="https://github.com" target="_blank" rel="noopener" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">GitHub</a></li>
+            <li><a href="#" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">Changelog</a></li>
+            <li><a href="#" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">Status</a></li>
+          </ul>
+        </div>
+
+        <!-- Legal -->
+        <div>
+          <h4 class="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">Legal</h4>
+          <ul class="space-y-2">
+            <li><a href="#" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">Privacy Policy</a></li>
+            <li><a href="#" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">Terms of Service</a></li>
+            <li><a href="#" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">Cookie Policy</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="border-t border-gray-800 pt-8 text-center">
+        <p class="text-sm text-gray-600">
+          &copy; <span id="footer-year"></span> {{PROJECT_NAME}}. All rights reserved.
+          Built on the <a href="https://modelcontextprotocol.io" target="_blank" rel="noopener" class="text-gray-500 hover:text-gray-300 transition-colors">Model Context Protocol</a>.
+        </p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ========== TOAST CONTAINER ========== -->
+  <div id="toast-container" class="fixed bottom-6 right-6 z-50 space-y-2"></div>
+
+  <!-- ========== JAVASCRIPT ========== -->
+  <script>
+    (function () {
+      'use strict';
+
+      // ------- Configuration -------
+      const CONFIG = {
+        API_BASE_URL: '{{API_BASE_URL}}',
+        STRIPE_KEY: '{{STRIPE_PUBLISHABLE_KEY}}',
+        PROJECT_SLUG: '{{PROJECT_SLUG}}',
+      };
+
+      function getReferralCode() {
+        try {
+          var params = new URLSearchParams(window.location.search);
+          return params.get('ref') || '';
+        } catch (_e) {
+          return '';
+        }
+      }
+
+      function getSignedUpEmail() {
+        return window.localStorage.getItem('signed_up_email') || '';
+      }
+
+      function setSignedUpEmail(email) {
+        try {
+          window.localStorage.setItem('signed_up_email', email || '');
+        } catch (_e) {
+          // Ignore localStorage failures
+        }
+      }
+
+      // ------- Feature Cards -------
+      function renderFeatures() {
+        const grid = document.getElementById('features-grid');
+        if (!grid) return;
+
+        let features = [];
+        try {
+          features = JSON.parse('{{FEATURES_JSON}}');
+        } catch (e) {
+          // Fallback: show placeholder if JSON not yet injected
+          grid.innerHTML = '<p class="col-span-full text-center text-gray-500">Features will appear here once configured.</p>';
+          return;
+        }
+
+        grid.innerHTML = features.map(function (f) {
+          return (
+            '<div class="gradient-border rounded-xl p-6 hover:bg-gray-800/50 transition-colors">' +
+              '<div class="text-3xl mb-4">' + escapeHtml(f.icon || '') + '</div>' +
+              '<h3 class="text-lg font-semibold mb-2">' + escapeHtml(f.title) + '</h3>' +
+              '<p class="text-gray-400 text-sm leading-relaxed">' + escapeHtml(f.description) + '</p>' +
+            '</div>'
+          );
+        }).join('');
+      }
+
+      // ------- Tools List -------
+      function renderTools() {
+        var container = document.getElementById('tools-list');
+        if (!container) return;
+
+        var tools = [];
+        try {
+          tools = JSON.parse('{{TOOLS_JSON}}');
+        } catch (e) {
+          container.innerHTML = '<p class="text-gray-500">Tools will appear here once configured.</p>';
+          return;
+        }
+
+        // Group by category
+        var grouped = {};
+        tools.forEach(function (t) {
+          var cat = t.category || 'General';
+          if (!grouped[cat]) grouped[cat] = [];
+          grouped[cat].push(t);
+        });
+
+        var html = '';
+        Object.keys(grouped).forEach(function (category) {
+          html += '<div class="mb-4">';
+          html += '<h4 class="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-2">' + escapeHtml(category) + '</h4>';
+          grouped[category].forEach(function (tool) {
+            html +=
+              '<div class="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-800/50 transition-colors">' +
+                '<code class="text-blue-400 text-sm font-mono whitespace-nowrap mt-0.5">' + escapeHtml(tool.name) + '</code>' +
+                '<span class="text-gray-500 text-sm">' + escapeHtml(tool.description) + '</span>' +
+              '</div>';
+          });
+          html += '</div>';
+        });
+
+        container.innerHTML = html;
+      }
+
+      // ------- API Key Signup -------
+      function initSignup() {
+        var form = document.getElementById('signup-form');
+        var emailInput = document.getElementById('signup-email');
+        var errorEl = document.getElementById('signup-error');
+        var resultEl = document.getElementById('api-key-result');
+        var keyValueEl = document.getElementById('api-key-value');
+        var btnGetKey = document.getElementById('btn-get-key');
+        var btnCopyKey = document.getElementById('btn-copy-key');
+
+        if (!form) return;
+
+        form.addEventListener('submit', function (e) {
+          e.preventDefault();
+          var email = emailInput.value.trim();
+          if (!email) return;
+
+          // Disable button and show loading
+          btnGetKey.disabled = true;
+          btnGetKey.textContent = 'Creating...';
+          errorEl.classList.add('hidden');
+
+          fetch(CONFIG.API_BASE_URL + '/billing/keys', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: email,
+              affiliate_code: getReferralCode(),
+            }),
+          })
+            .then(function (res) {
+              if (!res.ok) {
+                return res.json().then(function (data) {
+                  throw new Error(data.error || 'Failed to create API key');
+                });
+              }
+              return res.json();
+            })
+            .then(function (data) {
+              var key = data.apiKey || data.api_key || data.key;
+              if (!key) throw new Error('No API key in response');
+
+              keyValueEl.textContent = key;
+              setSignedUpEmail(email);
+              resultEl.classList.remove('hidden');
+              form.classList.add('hidden');
+              showToast('API key created successfully!', 'success');
+            })
+            .catch(function (err) {
+              errorEl.textContent = err.message;
+              errorEl.classList.remove('hidden');
+            })
+            .finally(function () {
+              btnGetKey.disabled = false;
+              btnGetKey.textContent = 'Get API Key';
+            });
+        });
+
+        // Copy key button
+        if (btnCopyKey) {
+          btnCopyKey.addEventListener('click', function () {
+            var key = keyValueEl.textContent;
+            if (!key) return;
+            navigator.clipboard.writeText(key).then(function () {
+              showToast('API key copied to clipboard', 'success');
+            });
+          });
+        }
+      }
+
+      // ------- Stripe Checkout (Pro Tier) -------
+      function initStripeCheckout() {
+        var btn = document.getElementById('btn-checkout-pro');
+        if (!btn) return;
+
+        btn.addEventListener('click', function () {
+          var email = getSignedUpEmail();
+          if (!email) {
+            showToast('Create an API key first so checkout is tied to your account.', 'error');
+            return;
+          }
+
+          btn.disabled = true;
+          btn.textContent = 'Redirecting...';
+
+          fetch(CONFIG.API_BASE_URL + '/billing/checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ plan: 'pro', email: email }),
+          })
+            .then(function (res) {
+              if (!res.ok) throw new Error('Failed to create checkout session');
+              return res.json();
+            })
+            .then(function (data) {
+              if (data.url || data.checkout_url) {
+                window.location.href = data.url || data.checkout_url;
+              } else {
+                throw new Error('No checkout URL returned');
+              }
+            })
+            .catch(function (err) {
+              showToast(err.message, 'error');
+              btn.disabled = false;
+              btn.textContent = 'Upgrade to Pro';
+            });
+        });
+      }
+
+      // ------- Consumer Browser Panel -------
+      function initConsumerPanel() {
+        var form = document.getElementById('consumer-form');
+        var toolSelect = document.getElementById('consumer-tool-select');
+        var argsInput = document.getElementById('consumer-arguments');
+        var apiKeyInput = document.getElementById('consumer-api-key');
+        var output = document.getElementById('consumer-output');
+        var runBtn = document.getElementById('btn-consumer-run');
+        if (!form) return;
+
+        fetch(CONFIG.API_BASE_URL + '/consumer/tools')
+          .then(function (res) { return res.json(); })
+          .then(function (data) {
+            if (!data.tools || !Array.isArray(data.tools)) return;
+            toolSelect.innerHTML = data.tools.map(function (tool) {
+              return '<option value="' + escapeHtml(tool.name) + '">' + escapeHtml(tool.name) + '</option>';
+            }).join('');
+          })
+          .catch(function () {
+            // Keep fallback options
+          });
+
+        form.addEventListener('submit', function (e) {
+          e.preventDefault();
+          var tool = toolSelect.value;
+          var args = {};
+          var apiKey = apiKeyInput.value.trim();
+
+          try {
+            args = JSON.parse(argsInput.value || '{}');
+          } catch (_e) {
+            showToast('Arguments must be valid JSON', 'error');
+            return;
+          }
+
+          runBtn.disabled = true;
+          runBtn.textContent = 'Running...';
+          output.textContent = 'Running request...';
+
+          fetch(CONFIG.API_BASE_URL + '/consumer/run', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tool: tool,
+              arguments: args,
+              api_key: apiKey,
+            }),
+          })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+              if (!data.ok) {
+                throw new Error((data.error && data.error.message) || data.error || 'Request failed');
+              }
+              output.textContent = String(data.result || '');
+            })
+            .catch(function (err) {
+              output.textContent = 'Error: ' + err.message;
+            })
+            .finally(function () {
+              runBtn.disabled = false;
+              runBtn.textContent = 'Run Tool';
+            });
+        });
+      }
+
+      // ------- Affiliate Signup -------
+      function initAffiliateSignup() {
+        var form = document.getElementById('affiliate-form');
+        if (!form) return;
+
+        var nameInput = document.getElementById('affiliate-name');
+        var emailInput = document.getElementById('affiliate-email');
+        var errorEl = document.getElementById('affiliate-error');
+        var resultEl = document.getElementById('affiliate-result');
+        var codeEl = document.getElementById('affiliate-code');
+        var urlEl = document.getElementById('affiliate-url');
+        var btn = document.getElementById('btn-affiliate-signup');
+
+        form.addEventListener('submit', function (e) {
+          e.preventDefault();
+          errorEl.classList.add('hidden');
+          btn.disabled = true;
+          btn.textContent = 'Creating...';
+
+          fetch(CONFIG.API_BASE_URL + '/affiliate/signup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              partner_name: nameInput.value.trim(),
+              payout_email: emailInput.value.trim(),
+            }),
+          })
+            .then(function (res) {
+              return res.json().then(function (data) {
+                if (!res.ok) throw new Error(data.error || 'Failed to create affiliate account');
+                return data;
+              });
+            })
+            .then(function (data) {
+              codeEl.textContent = data.affiliate_code || '';
+              urlEl.textContent = data.referral_url || '';
+              resultEl.classList.remove('hidden');
+              showToast('Affiliate account created', 'success');
+            })
+            .catch(function (err) {
+              errorEl.textContent = err.message;
+              errorEl.classList.remove('hidden');
+            })
+            .finally(function () {
+              btn.disabled = false;
+              btn.textContent = 'Join Affiliate Program';
+            });
+        });
+      }
+
+      // ------- Public Comparison Table -------
+      function loadComparisonTable() {
+        var body = document.getElementById('comparison-table-body');
+        if (!body) return;
+        fetch(CONFIG.API_BASE_URL + '/public-comparison.json')
+          .then(function (res) { return res.json(); })
+          .then(function (data) {
+            if (!data.items || !Array.isArray(data.items) || !data.items.length) return;
+            body.innerHTML = data.items.map(function (item) {
+              return (
+                '<tr class="border-b border-gray-900">' +
+                  '<td class="py-3 pr-4">' + escapeHtml(item.provider || '') + '</td>' +
+                  '<td class="py-3 pr-4">' + escapeHtml(item.positioning || '') + '</td>' +
+                  '<td class="py-3 pr-4">' + escapeHtml(item.public_strength || '') + '</td>' +
+                  '<td class="py-3 pr-4">' + escapeHtml(item.public_gap || '') + '</td>' +
+                '</tr>'
+              );
+            }).join('');
+          })
+          .catch(function () {
+            // Keep default static row
+          });
+      }
+
+      // ------- Copy Buttons (code blocks) -------
+      function initCopyButtons() {
+        document.querySelectorAll('.copy-btn').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var targetId = btn.getAttribute('data-target');
+            var target = document.getElementById(targetId);
+            if (!target) return;
+            var text = target.textContent;
+            navigator.clipboard.writeText(text).then(function () {
+              showToast('Copied to clipboard', 'success');
+            });
+          });
+        });
+      }
+
+      // ------- Mobile Navigation -------
+      function initMobileNav() {
+        var menuBtn = document.getElementById('mobile-menu-btn');
+        var closeBtn = document.getElementById('mobile-menu-close');
+        var menu = document.getElementById('mobile-menu');
+
+        if (!menuBtn || !menu) return;
+
+        menuBtn.addEventListener('click', function () {
+          menu.classList.add('mobile-nav-open');
+        });
+
+        closeBtn.addEventListener('click', function () {
+          menu.classList.remove('mobile-nav-open');
+        });
+
+        // Close on link click
+        document.querySelectorAll('.mobile-nav-link').forEach(function (link) {
+          link.addEventListener('click', function () {
+            menu.classList.remove('mobile-nav-open');
+          });
+        });
+      }
+
+      // ------- Scroll-triggered Fade In -------
+      function initScrollAnimations() {
+        var sections = document.querySelectorAll('.fade-in-section');
+        if (!sections.length) return;
+
+        var observer = new IntersectionObserver(
+          function (entries) {
+            entries.forEach(function (entry) {
+              if (entry.isIntersecting) {
+                entry.target.classList.add('visible');
+              }
+            });
+          },
+          { threshold: 0.1 }
+        );
+
+        sections.forEach(function (section) {
+          observer.observe(section);
+        });
+      }
+
+      // ------- Nav Background on Scroll -------
+      function initNavScroll() {
+        var nav = document.getElementById('nav');
+        if (!nav) return;
+
+        window.addEventListener('scroll', function () {
+          if (window.scrollY > 20) {
+            nav.classList.add('border-gray-700/50');
+            nav.classList.remove('border-gray-800/50');
+          } else {
+            nav.classList.remove('border-gray-700/50');
+            nav.classList.add('border-gray-800/50');
+          }
+        });
+      }
+
+      // ------- Toast Notifications -------
+      function showToast(message, type) {
+        var container = document.getElementById('toast-container');
+        if (!container) return;
+
+        var bgColor = type === 'error'
+          ? 'bg-red-900/90 border-red-700'
+          : 'bg-green-900/90 border-green-700';
+
+        var toast = document.createElement('div');
+        toast.className = 'toast px-4 py-3 rounded-lg border text-sm font-medium ' + bgColor;
+        toast.textContent = message;
+        container.appendChild(toast);
+
+        setTimeout(function () {
+          if (toast.parentNode) toast.parentNode.removeChild(toast);
+        }, 3000);
+      }
+
+      // ------- Footer Year -------
+      function setFooterYear() {
+        var el = document.getElementById('footer-year');
+        if (el) el.textContent = new Date().getFullYear();
+      }
+
+      // ------- Utility: Escape HTML -------
+      function escapeHtml(str) {
+        var div = document.createElement('div');
+        div.appendChild(document.createTextNode(str));
+        return div.innerHTML;
+      }
+
+      // ------- Initialize Everything -------
+      document.addEventListener('DOMContentLoaded', function () {
+        renderFeatures();
+        renderTools();
+        loadComparisonTable();
+        initSignup();
+        initStripeCheckout();
+        initConsumerPanel();
+        initAffiliateSignup();
+        initCopyButtons();
+        initMobileNav();
+        initScrollAnimations();
+        initNavScroll();
+        setFooterYear();
+      });
+    })();
+  </script>
+
+</body>
+</html>

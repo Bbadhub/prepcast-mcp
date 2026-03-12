@@ -1,0 +1,16 @@
+{
+  "weights": {
+    "accuracy": 0.3,
+    "workflow_depth": 0.25,
+    "deployment_speed": 0.15,
+    "consumer_usability": 0.15,
+    "ops_visibility": 0.15
+  },
+  "premium_multiplier_if_ahead": 1.15,
+  "discount_multiplier_if_behind": 0.9,
+  "min_pro_price_usd": 39,
+  "max_pro_price_usd": 399,
+  "min_free_calls": 100,
+  "min_pro_calls": 10000,
+  "pro_calls_multiplier": 1.1
+}

@@ -1,0 +1,28 @@
+# Caddyfile - Reverse proxy with automatic HTTPS
+#
+# Replace "your-domain.com" with your actual domain.
+# Caddy will automatically provision TLS certificates via Let's Encrypt.
+#
+# Usage:
+#   docker compose --profile proxy up -d
+
+your-domain.com {
+    # Reverse proxy to the MCP server
+    reverse_proxy mcp-server:{{SERVER_PORT}}
+
+    # SSE-specific settings (disable buffering for streaming)
+    @sse path /sse
+    handle @sse {
+        reverse_proxy mcp-server:{{SERVER_PORT}} {
+            flush_interval -1
+            transport http {
+                read_timeout 0
+            }
+        }
+    }
+
+    # Request logging
+    log {
+        output file /var/log/caddy/access.log
+    }
+}
