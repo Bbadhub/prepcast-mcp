@@ -20,8 +20,6 @@ Handlers:
     get_menu_ratios      - inspect current ratio config
 """
 
-import json
-import os
 from typing import Any, Dict
 from datetime import date
 
@@ -29,8 +27,9 @@ from datetime import date
 # Storage
 # ---------------------------------------------------------------------------
 
-DATA_DIR = os.environ.get("PREPCAST_DATA_DIR", "/tmp/prepcast")
-RATIOS_FILE = os.path.join(DATA_DIR, "menu_ratios.json")
+from store import load_json_dict, save_json
+
+RATIOS_FILE = "menu_ratios.json"
 
 # ---------------------------------------------------------------------------
 # Five Guys Default Ratios - units per $1,000 revenue
@@ -110,21 +109,15 @@ DEFAULT_RATIOS = {
 }
 
 
-def _load_ratios() -> Dict:
-    if os.path.exists(RATIOS_FILE):
-        try:
-            with open(RATIOS_FILE) as f:
-                saved = json.load(f)
-                return {**DEFAULT_RATIOS, **saved}
-        except Exception:
-            pass
+def _load_ratios(location_id: str = "default") -> Dict:
+    saved = load_json_dict(location_id, RATIOS_FILE)
+    if saved:
+        return {**DEFAULT_RATIOS, **saved}
     return dict(DEFAULT_RATIOS)
 
 
-def _save_ratios(ratios: Dict):
-    os.makedirs(DATA_DIR, exist_ok=True)
-    with open(RATIOS_FILE, "w") as f:
-        json.dump(ratios, f, indent=2)
+def _save_ratios(ratios: Dict, location_id: str = "default"):
+    save_json(location_id, RATIOS_FILE, ratios)
 
 
 # ===========================================================================
@@ -171,11 +164,12 @@ async def handle_generate_prep_list(arguments: dict) -> str:
     buffer_pct = float(arguments.get("buffer_pct", 10.0))
     date_str = arguments.get("date", "") or "today"
     notes = arguments.get("notes", "")
+    location_id = arguments.get("_location_id", "default")
 
     if not projected_revenue or projected_revenue <= 0:
         return "projected_revenue is required and must be greater than 0."
 
-    r = _load_ratios()
+    r = _load_ratios(location_id)
     k = projected_revenue / 1000.0
     buf = 1 + (buffer_pct / 100.0)
 
@@ -317,17 +311,18 @@ UPDATE_RATIOS_TOOL = {
 async def handle_update_menu_ratios(arguments: dict) -> str:
     ratio_key = arguments.get("ratio_key", "")
     value = arguments.get("value")
+    location_id = arguments.get("_location_id", "default")
     if not ratio_key:
         return "ratio_key is required."
     if value is None:
         return "value is required."
-    ratios = _load_ratios()
+    ratios = _load_ratios(location_id)
     if ratio_key not in ratios:
         valid = ", ".join(list(ratios.keys())[:10]) + "..."
         return f"Unknown ratio key '{ratio_key}'. Valid keys include: {valid}"
     old = ratios[ratio_key]
     ratios[ratio_key] = float(value)
-    _save_ratios(ratios)
+    _save_ratios(ratios, location_id)
     return f"Updated {ratio_key}: {old} -> {value}"
 
 
@@ -347,7 +342,8 @@ GET_RATIOS_TOOL = {
 
 
 async def handle_get_menu_ratios(arguments: dict) -> str:
-    ratios = _load_ratios()
+    location_id = arguments.get("_location_id", "default")
+    ratios = _load_ratios(location_id)
     lines = ["FIVE GUYS PREP RATIOS", ""]
     sections = {
         "PROTEINS (units per $1k revenue)": [

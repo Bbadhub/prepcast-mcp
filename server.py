@@ -126,6 +126,18 @@ async def handle_jsonrpc(message: Dict[str, Any], api_key: str = "", session_id:
                 },
             }
 
+        # --- Inject location_id from bearer token into arguments -----------
+        if api_key and "_location_id" not in arguments:
+            try:
+                from store import get_user_by_api_key
+                _u = get_user_by_api_key(api_key)
+                if _u:
+                    arguments = dict(arguments)
+                    arguments["_location_id"] = _u.get("location_id", "default")
+                    arguments["_user_role"] = _u.get("role", "store")
+            except Exception:
+                pass
+
         # --- Middleware: pull enriched context before tool executes --------
         sync_engine = get_sync_engine()
         _context = await sync_engine.get_context(tool_name, str(arguments))

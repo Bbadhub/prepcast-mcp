@@ -1,44 +1,25 @@
 """
 PrepCast - Authentication
 
-Simple email/password auth with bcrypt hashing.
-Users are stored in /tmp/prepcast/users.json alongside sales data.
+Simple email/password auth with SHA-256+salt hashing.
+Users are stored in Postgres (when DATABASE_URL is set) or users.json fallback.
 On signup: creates a user record + issues a bearer token.
 On login: validates password, returns bearer token.
 
-The bearer token IS the MCP API key (mcp_xxx format) — users paste it
+The bearer token IS the MCP API key (mcp_xxx format) -- users paste it
 directly into their Claude connector or Authorization header.
 """
 
 import hashlib
-import json
 import os
 import secrets
-import time
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Dict, Optional
 
 from aiohttp import web
-from store import slugify
+from store import slugify, load_users, save_users, upsert_user, get_user_by_api_key
 
-DATA_DIR = Path(os.environ.get("PREPCAST_DATA_DIR", "/tmp/prepcast"))
-USERS_FILE = DATA_DIR / "users.json"
 TRIAL_DAYS = 14
-
-
-def _load_users() -> Dict:
-    if not USERS_FILE.exists():
-        return {}
-    try:
-        return json.loads(USERS_FILE.read_text())
-    except Exception:
-        return {}
-
-
-def _save_users(users: Dict):
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    USERS_FILE.write_text(json.dumps(users, indent=2))
 
 
 def _hash_password(password: str) -> str:
@@ -109,7 +90,7 @@ def add_auth_routes(app: web.Application, usage_tracker):
         if len(password) < 6:
             return web.json_response({"error": "Password must be at least 6 characters"}, status=400)
 
-        users = _load_users()
+        users = load_users()
         if email in users:
             return web.json_response({"error": "Account already exists"}, status=409)
 
@@ -137,8 +118,7 @@ def add_auth_routes(app: web.Application, usage_tracker):
             "tier": "trial",
             "is_active": True,
         }
-        users[email] = user
-        _save_users(users)
+        upsert_user(email, user)
 
         return web.json_response({
             "ok": True,
@@ -174,7 +154,7 @@ def add_auth_routes(app: web.Application, usage_tracker):
         if not email or not password:
             return web.json_response({"error": "email and password required"}, status=400)
 
-        users = _load_users()
+        users = load_users()
         user = users.get(email)
 
         if not user or not _verify_password(password, user.get("password_hash", "")):
@@ -208,9 +188,7 @@ def add_auth_routes(app: web.Application, usage_tracker):
         if not api_key_str:
             api_key_str = request.headers.get("X-API-Key", "")
 
-        users = _load_users()
-        # Find user by api_key
-        user = next((u for u in users.values() if u.get("api_key") == api_key_str), None)
+        user = get_user_by_api_key(api_key_str)
         if not user:
             return web.json_response({"error": "Invalid token"}, status=401)
 
@@ -237,7 +215,7 @@ def add_auth_routes(app: web.Application, usage_tracker):
         if expected and admin_key != expected:
             return web.json_response({"error": "Unauthorized"}, status=401)
 
-        users = _load_users()
+        users = load_users()
         result = []
         for u in users.values():
             result.append({

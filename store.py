@@ -1,6 +1,9 @@
 """
 PrepCast - Multi-Store Data Layer
 
+When DATABASE_URL is set, all persistence goes to Postgres (survives restarts).
+When DATABASE_URL is not set, falls back to flat-file JSON in PREPCAST_DATA_DIR.
+
 All data lives under:
   PREPCAST_DATA_DIR/<location_id>/sales_history.json
   PREPCAST_DATA_DIR/<location_id>/event_outcomes.json
@@ -40,10 +43,38 @@ def location_dir(location_id: str) -> Path:
     return p
 
 
+# ---------------------------------------------------------------------------
+# Users — flat file helpers (used by _FileBackend in db.py)
+# ---------------------------------------------------------------------------
+
+def _load_users_file() -> Dict:
+    if not USERS_FILE.exists():
+        return {}
+    try:
+        return json.loads(USERS_FILE.read_text())
+    except Exception:
+        return {}
+
+
+def _save_users_file(users: Dict):
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    USERS_FILE.write_text(json.dumps(users, indent=2))
+
+
+# ---------------------------------------------------------------------------
+# Storage — routes to Postgres when DATABASE_URL is set
+# ---------------------------------------------------------------------------
+
+def _use_pg() -> bool:
+    return bool(os.environ.get("DATABASE_URL", ""))
+
+
 def list_location_ids() -> List[str]:
-    """Return all known location IDs (legacy + named)."""
+    if _use_pg():
+        from db import pg_list_location_ids
+        return pg_list_location_ids()
+    # flat-file
     ids = []
-    # legacy root
     if (DATA_DIR / "sales_history.json").exists():
         ids.append("default")
     loc_root = DATA_DIR / "locations"
@@ -55,6 +86,9 @@ def list_location_ids() -> List[str]:
 
 
 def load_json(location_id: str, filename: str) -> list:
+    if _use_pg():
+        from db import pg_load_list
+        return pg_load_list(location_id, filename)
     p = location_dir(location_id) / filename
     if not p.exists():
         return []
@@ -66,6 +100,9 @@ def load_json(location_id: str, filename: str) -> list:
 
 
 def load_json_dict(location_id: str, filename: str) -> dict:
+    if _use_pg():
+        from db import pg_load_dict
+        return pg_load_dict(location_id, filename)
     p = location_dir(location_id) / filename
     if not p.exists():
         return {}
@@ -77,14 +114,55 @@ def load_json_dict(location_id: str, filename: str) -> dict:
 
 
 def save_json(location_id: str, filename: str, data):
+    if _use_pg():
+        from db import pg_save
+        pg_save(location_id, filename, data)
+        return
     d = location_dir(location_id)
     (d / filename).write_text(json.dumps(data, indent=2))
 
 
+# ---------------------------------------------------------------------------
+# Users — routes to Postgres when available
+# ---------------------------------------------------------------------------
+
+def load_users() -> Dict[str, dict]:
+    if _use_pg():
+        from db import pg_load_users
+        return pg_load_users()
+    return _load_users_file()
+
+
+def save_users(users: Dict[str, dict]):
+    if _use_pg():
+        from db import pg_save_users
+        pg_save_users(users)
+        return
+    _save_users_file(users)
+
+
+def upsert_user(email: str, user: dict):
+    if _use_pg():
+        from db import pg_upsert_user
+        pg_upsert_user(email, user)
+        return
+    users = _load_users_file()
+    users[email] = user
+    _save_users_file(users)
+
+
+def get_user_by_api_key(api_key: str) -> Optional[dict]:
+    if _use_pg():
+        from db import pg_get_user_by_api_key
+        return pg_get_user_by_api_key(api_key)
+    users = _load_users_file()
+    return next((u for u in users.values() if u.get("api_key") == api_key), None)
+
+
 def get_location_name(location_id: str) -> str:
-    """Try to get a human-readable name from users.json."""
+    """Try to get a human-readable name from users."""
     try:
-        users = json.loads(USERS_FILE.read_text())
+        users = load_users()
         for u in users.values():
             if u.get("location_id") == location_id:
                 return u.get("location_name") or location_id
@@ -114,7 +192,7 @@ def resolve_location(token_user: dict, requested_id: Optional[str]) -> Optional[
 def get_users_by_location() -> Dict[str, dict]:
     """Return dict of location_id -> user record."""
     try:
-        users = json.loads(USERS_FILE.read_text())
+        users = load_users()
         result = {}
         for u in users.values():
             lid = u.get("location_id", "default")

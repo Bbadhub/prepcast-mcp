@@ -5,8 +5,6 @@ Manages event-based traffic multipliers for locations near sports venues.
 Supports AdventHealth Sports Park (Blue Hawk) in Overland Park KS by default.
 """
 
-import json
-import os
 import re
 import urllib.request
 import urllib.error
@@ -14,8 +12,9 @@ from datetime import date, datetime
 from typing import Dict, List, Optional
 import statistics
 
-DATA_DIR = os.environ.get("PREPCAST_DATA_DIR", "/tmp/prepcast")
-EVENT_OUTCOMES_FILE = os.path.join(DATA_DIR, "event_outcomes.json")
+from store import load_json, save_json
+
+EVENT_OUTCOMES_FILE = "event_outcomes.json"
 
 DEFAULT_EVENT_MULTIPLIERS = {
     "volleyball": 1.45,
@@ -48,24 +47,16 @@ def _classify_event(title: str) -> str:
     return "default"
 
 
-def _load_outcomes() -> List[Dict]:
-    if not os.path.exists(EVENT_OUTCOMES_FILE):
-        return []
-    try:
-        with open(EVENT_OUTCOMES_FILE) as f:
-            return json.load(f)
-    except Exception:
-        return []
+def _load_outcomes(location_id: str = "default") -> List[Dict]:
+    return load_json(location_id, EVENT_OUTCOMES_FILE)
 
 
-def _save_outcomes(outcomes: List[Dict]):
-    os.makedirs(DATA_DIR, exist_ok=True)
-    with open(EVENT_OUTCOMES_FILE, "w") as f:
-        json.dump(outcomes, f, indent=2)
+def _save_outcomes(outcomes: List[Dict], location_id: str = "default"):
+    save_json(location_id, EVENT_OUTCOMES_FILE, outcomes)
 
 
-def _learned_multipliers() -> Dict[str, float]:
-    outcomes = _load_outcomes()
+def _learned_multipliers(location_id: str = "default") -> Dict[str, float]:
+    outcomes = _load_outcomes(location_id)
     if not outcomes:
         return {}
     buckets: Dict[str, List[float]] = {}
@@ -98,7 +89,8 @@ GET_UPCOMING_EVENTS_TOOL = {
 
 async def handle_get_upcoming_events(arguments: dict) -> str:
     days_ahead = int(arguments.get("days_ahead", 14))
-    learned = _learned_multipliers()
+    location_id = arguments.get("_location_id", "default")
+    learned = _learned_multipliers(location_id)
     events_found = []
     fetch_note = ""
 
@@ -200,7 +192,8 @@ async def handle_log_event_outcome(arguments: dict) -> str:
     etype = event_type or _classify_event(event_name)
     multiplier = round(actual_revenue / baseline_revenue, 3) if baseline_revenue else 0
 
-    outcomes = _load_outcomes()
+    location_id = arguments.get("_location_id", "default")
+    outcomes = _load_outcomes(location_id)
     outcomes.append({
         "event_date": event_date,
         "event_name": event_name,
@@ -211,9 +204,9 @@ async def handle_log_event_outcome(arguments: dict) -> str:
         "actual_multiplier": multiplier,
         "logged_at": datetime.utcnow().isoformat(),
     })
-    _save_outcomes(outcomes)
+    _save_outcomes(outcomes, location_id)
 
-    learned = _learned_multipliers()
+    learned = _learned_multipliers(location_id)
     new_mult = learned.get(etype, multiplier)
     count = sum(1 for o in outcomes if o.get("event_type") == etype)
 
@@ -234,8 +227,9 @@ GET_EVENT_MULTIPLIERS_TOOL = {
 
 
 async def handle_get_event_multipliers(arguments: dict) -> str:
-    learned = _learned_multipliers()
-    outcomes = _load_outcomes()
+    location_id = arguments.get("_location_id", "default")
+    learned = _learned_multipliers(location_id)
+    outcomes = _load_outcomes(location_id)
 
     lines = ["EVENT MULTIPLIERS", ""]
     lines.append(f"  {'Event Type':<22}  {'Multiplier':>10}  {'Source':<12}  Data Points")

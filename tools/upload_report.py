@@ -12,34 +12,25 @@ Supported formats:
 
 import csv
 import io
-import json
-import os
 import re
 from datetime import date, datetime
 from typing import Dict, List, Optional, Tuple
 
-DATA_DIR = os.environ.get("PREPCAST_DATA_DIR", "/tmp/prepcast")
-SALES_FILE = os.path.join(DATA_DIR, "sales_history.json")
+from store import load_json, save_json
+
+SALES_FILE = "sales_history.json"
 
 
-def _load_sales() -> List[Dict]:
-    if not os.path.exists(SALES_FILE):
-        return []
-    try:
-        with open(SALES_FILE) as f:
-            return json.load(f)
-    except Exception:
-        return []
+def _load_sales(location_id: str = "default") -> List[Dict]:
+    return load_json(location_id, SALES_FILE)
 
 
-def _save_sales(records: List[Dict]):
-    os.makedirs(DATA_DIR, exist_ok=True)
+def _save_sales(records: List[Dict], location_id: str = "default"):
     by_date = {}
     for r in records:
         by_date[r["date"]] = r
     sorted_records = sorted(by_date.values(), key=lambda x: x["date"])
-    with open(SALES_FILE, "w") as f:
-        json.dump(sorted_records, f, indent=2)
+    save_json(location_id, SALES_FILE, sorted_records)
 
 
 def _parse_date(s: str) -> Optional[str]:
@@ -151,6 +142,7 @@ UPLOAD_SALES_CSV_TOOL = {
 async def handle_upload_sales_csv(arguments: dict) -> str:
     csv_text = arguments.get("csv_text", "")
     location_name = arguments.get("location_name", "")
+    location_id = arguments.get("_location_id", "default")
 
     if not csv_text or not csv_text.strip():
         return "csv_text is required. Paste your spreadsheet contents."
@@ -181,10 +173,10 @@ async def handle_upload_sales_csv(arguments: dict) -> str:
         for r in records:
             r["location"] = location_name
 
-    existing = _load_sales()
+    existing = _load_sales(location_id)
     combined = existing + records
-    _save_sales(combined)
-    final = _load_sales()
+    _save_sales(combined, location_id)
+    final = _load_sales(location_id)
 
     return (
         f"Imported {len(records)} records.\n"
@@ -214,6 +206,7 @@ async def handle_log_daily_sales(arguments: dict) -> str:
     date_str = arguments.get("date", "")
     revenue = arguments.get("revenue", 0)
     notes = arguments.get("notes", "")
+    location_id = arguments.get("_location_id", "default")
 
     if not date_str or not revenue:
         return "date and revenue are required."
@@ -226,10 +219,10 @@ async def handle_log_daily_sales(arguments: dict) -> str:
     if notes:
         record["notes"] = notes
 
-    existing = _load_sales()
+    existing = _load_sales(location_id)
     existing.append(record)
-    _save_sales(existing)
-    final = _load_sales()
+    _save_sales(existing, location_id)
+    final = _load_sales(location_id)
 
     return (
         f"Logged: {parsed_date}  ${float(revenue):,.0f}"
@@ -246,7 +239,8 @@ GET_SALES_SUMMARY_TOOL = {
 
 
 async def handle_get_sales_summary(arguments: dict) -> str:
-    records = _load_sales()
+    location_id = arguments.get("_location_id", "default")
+    records = _load_sales(location_id)
     if not records:
         return (
             "No sales history loaded.\n"

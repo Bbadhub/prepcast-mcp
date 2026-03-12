@@ -5,25 +5,18 @@ Given a location's historical daily sales data, project revenue for a target
 date factoring in day-of-week baseline, recent trend (EMA), and event multipliers.
 """
 
-import json
-import os
 import statistics
 from datetime import datetime, date, timedelta
 from typing import Any, Dict, List, Optional
 from collections import defaultdict
 
-DATA_DIR = os.environ.get("PREPCAST_DATA_DIR", "/tmp/prepcast")
-SALES_FILE = os.path.join(DATA_DIR, "sales_history.json")
+from store import load_json
+
+SALES_FILE = "sales_history.json"
 
 
-def _load_sales() -> List[Dict]:
-    if not os.path.exists(SALES_FILE):
-        return []
-    try:
-        with open(SALES_FILE) as f:
-            return json.load(f)
-    except Exception:
-        return []
+def _load_sales(location_id: str = "default") -> List[Dict]:
+    return load_json(location_id, SALES_FILE)
 
 
 def _day_name(dt: date) -> str:
@@ -128,8 +121,9 @@ async def handle_forecast_sales(arguments: dict) -> str:
     event_name = arguments.get("event_name", "")
     event_attendance = int(arguments.get("event_attendance", 0))
     event_multiplier = float(arguments.get("event_multiplier", 0.0))
+    location_id = arguments.get("_location_id", "default")
 
-    records = _load_sales()
+    records = _load_sales(location_id)
 
     try:
         td = date.fromisoformat(target_date) if target_date else date.today()
@@ -216,7 +210,8 @@ ANALYZE_HISTORY_TOOL = {
 
 async def handle_analyze_history(arguments: dict) -> str:
     weeks = int(arguments.get("weeks", 0))
-    records = _load_sales()
+    location_id = arguments.get("_location_id", "default")
+    records = _load_sales(location_id)
 
     if not records:
         return "No sales history found. Use upload_sales_csv to import your spreadsheets."
