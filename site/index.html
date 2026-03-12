@@ -162,6 +162,9 @@
       const m = document.getElementById('mobile-menu');
       m.classList.toggle('hidden');
     }
+    // Wake the server as soon as anyone lands on the marketing page.
+    // By the time they read the page and click "Start Free Trial", it's warm.
+    fetch('/health').catch(() => {});
   </script>
 
   <!-- HERO -->

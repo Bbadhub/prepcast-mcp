@@ -118,6 +118,23 @@
       });
     }
 
+    async function sendLogin(payload) {
+      const deadline = Date.now() + 90000;
+      while (Date.now() < deadline) {
+        try {
+          return await fetch('/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+        } catch (_) {
+          if (Date.now() + 4000 > deadline) throw new Error('timeout');
+          await new Promise(r => setTimeout(r, 4000));
+        }
+      }
+      throw new Error('timeout');
+    }
+
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const btn = document.getElementById('submitBtn');
@@ -126,27 +143,15 @@
       btn.textContent = 'Signing in...';
       btn.disabled = true;
 
-      const slowHint = setTimeout(() => {
-        if (btn.disabled) btn.textContent = 'Starting up server (~30s on first load)...';
-      }, 4000);
-
       try {
-        const controller = new AbortController();
-        setTimeout(() => controller.abort(), 55000);
-        const res = await fetch('/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: document.getElementById('email').value.trim(),
-            password: document.getElementById('password').value,
-          }),
-          signal: controller.signal,
+        const res = await sendLogin({
+          email: document.getElementById('email').value.trim(),
+          password: document.getElementById('password').value,
         });
-        clearTimeout(slowHint);
         const data = await res.json();
 
         if (!res.ok || data.error) {
-          errEl.textContent = data.error || 'Login failed';
+          errEl.textContent = data.error || 'Invalid email or password.';
           errEl.classList.remove('hidden');
           btn.textContent = 'Sign in';
           btn.disabled = false;
@@ -166,9 +171,8 @@
 
         document.getElementById('loginForm').classList.add('hidden');
         document.getElementById('tokenPanel').classList.remove('hidden');
-      } catch (err) {
-        clearTimeout(slowHint);
-        errEl.textContent = 'Could not reach the server. Please refresh and try again.';
+      } catch (_) {
+        errEl.textContent = 'Something went wrong. Please try again.';
         errEl.classList.remove('hidden');
         btn.textContent = 'Sign in';
         btn.disabled = false;

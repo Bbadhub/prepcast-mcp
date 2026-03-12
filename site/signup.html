@@ -139,7 +139,7 @@
     document.getElementById('sseUrl').textContent = window.location.origin + '/sse';
     let currentToken = '';
 
-    // Ping server on page load to wake it from Render free-tier sleep
+    // Wake server on page load — user is still filling the form by the time it's ready
     fetch('/health').catch(() => {});
 
     function copyToken() {
@@ -160,27 +160,27 @@
       });
     }
 
-    async function doSignup(payload, btn, errEl, attempt) {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 55000); // 55s for cold start
-      try {
-        const res = await fetch('/auth/signup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-          signal: controller.signal,
-        });
-        clearTimeout(timeout);
-        return res;
-      } catch (err) {
-        clearTimeout(timeout);
-        if (err.name === 'AbortError' && attempt < 2) {
-          btn.textContent = 'Still starting up — retrying...';
-          await new Promise(r => setTimeout(r, 3000));
-          return doSignup(payload, btn, errEl, attempt + 1);
+    // Send payload, retrying silently until server is ready (handles cold start)
+    async function sendSignup(payload) {
+      const TIMEOUT = 90000; // 90s total budget
+      const RETRY_DELAY = 4000;
+      const deadline = Date.now() + TIMEOUT;
+
+      while (Date.now() < deadline) {
+        try {
+          const res = await fetch('/auth/signup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          return res; // got a response (success or error — either way, we're done retrying)
+        } catch (_) {
+          // Network error / server not up yet — wait and retry silently
+          if (Date.now() + RETRY_DELAY > deadline) throw new Error('timeout');
+          await new Promise(r => setTimeout(r, RETRY_DELAY));
         }
-        throw err;
       }
+      throw new Error('timeout');
     }
 
     document.getElementById('signupForm').addEventListener('submit', async (e) => {
@@ -188,8 +188,6 @@
       const btn = document.getElementById('submitBtn');
       const errEl = document.getElementById('errorMsg');
       errEl.classList.add('hidden');
-      btn.textContent = 'Creating account...';
-      btn.disabled = true;
 
       const payload = {
         email: document.getElementById('email').value.trim(),
@@ -198,34 +196,27 @@
         location_name: document.getElementById('location_name').value.trim(),
       };
 
-      // Client-side validation
+      // Client-side validation only — never mention server state to user
       if (!payload.email || !payload.email.includes('@')) {
         errEl.textContent = 'Please enter a valid email address.';
         errEl.classList.remove('hidden');
-        btn.textContent = 'Start free trial';
-        btn.disabled = false;
         return;
       }
       if (payload.password.length < 6) {
         errEl.textContent = 'Password must be at least 6 characters.';
         errEl.classList.remove('hidden');
-        btn.textContent = 'Start free trial';
-        btn.disabled = false;
         return;
       }
 
-      // Show slow-start hint after 4s
-      const slowHint = setTimeout(() => {
-        if (btn.disabled) btn.textContent = 'Starting up server (first load can take ~30s)...';
-      }, 4000);
+      btn.textContent = 'Creating account...';
+      btn.disabled = true;
 
       try {
-        const res = await doSignup(payload, btn, errEl, 1);
-        clearTimeout(slowHint);
+        const res = await sendSignup(payload);
         const data = await res.json();
 
         if (!res.ok || data.error) {
-          errEl.textContent = data.error || 'Signup failed. Please try again.';
+          errEl.textContent = data.error || 'Something went wrong. Please try again.';
           errEl.classList.remove('hidden');
           btn.textContent = 'Start free trial';
           btn.disabled = false;
@@ -239,9 +230,8 @@
         document.getElementById('tokenDisplay').textContent = data.bearer_token;
         document.getElementById('signupCard').classList.add('hidden');
         document.getElementById('successPanel').classList.remove('hidden');
-      } catch (err) {
-        clearTimeout(slowHint);
-        errEl.textContent = 'Could not reach the server. Please refresh and try again.';
+      } catch (_) {
+        errEl.textContent = 'Something went wrong. Please try again.';
         errEl.classList.remove('hidden');
         btn.textContent = 'Start free trial';
         btn.disabled = false;
