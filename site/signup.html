@@ -139,6 +139,9 @@
     document.getElementById('sseUrl').textContent = window.location.origin + '/sse';
     let currentToken = '';
 
+    // Ping server on page load to wake it from Render free-tier sleep
+    fetch('/health').catch(() => {});
+
     function copyToken() {
       if (!currentToken) return;
       navigator.clipboard.writeText(currentToken).then(() => {
@@ -157,6 +160,29 @@
       });
     }
 
+    async function doSignup(payload, btn, errEl, attempt) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 55000); // 55s for cold start
+      try {
+        const res = await fetch('/auth/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+        return res;
+      } catch (err) {
+        clearTimeout(timeout);
+        if (err.name === 'AbortError' && attempt < 2) {
+          btn.textContent = 'Still starting up — retrying...';
+          await new Promise(r => setTimeout(r, 3000));
+          return doSignup(payload, btn, errEl, attempt + 1);
+        }
+        throw err;
+      }
+    }
+
     document.getElementById('signupForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const btn = document.getElementById('submitBtn');
@@ -165,21 +191,41 @@
       btn.textContent = 'Creating account...';
       btn.disabled = true;
 
+      const payload = {
+        email: document.getElementById('email').value.trim(),
+        password: document.getElementById('password').value,
+        name: document.getElementById('name').value.trim(),
+        location_name: document.getElementById('location_name').value.trim(),
+      };
+
+      // Client-side validation
+      if (!payload.email || !payload.email.includes('@')) {
+        errEl.textContent = 'Please enter a valid email address.';
+        errEl.classList.remove('hidden');
+        btn.textContent = 'Start free trial';
+        btn.disabled = false;
+        return;
+      }
+      if (payload.password.length < 6) {
+        errEl.textContent = 'Password must be at least 6 characters.';
+        errEl.classList.remove('hidden');
+        btn.textContent = 'Start free trial';
+        btn.disabled = false;
+        return;
+      }
+
+      // Show slow-start hint after 4s
+      const slowHint = setTimeout(() => {
+        if (btn.disabled) btn.textContent = 'Starting up server (first load can take ~30s)...';
+      }, 4000);
+
       try {
-        const res = await fetch('/auth/signup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: document.getElementById('email').value,
-            password: document.getElementById('password').value,
-            name: document.getElementById('name').value,
-            location_name: document.getElementById('location_name').value,
-          }),
-        });
+        const res = await doSignup(payload, btn, errEl, 1);
+        clearTimeout(slowHint);
         const data = await res.json();
 
         if (!res.ok || data.error) {
-          errEl.textContent = data.error || 'Signup failed';
+          errEl.textContent = data.error || 'Signup failed. Please try again.';
           errEl.classList.remove('hidden');
           btn.textContent = 'Start free trial';
           btn.disabled = false;
@@ -194,7 +240,8 @@
         document.getElementById('signupCard').classList.add('hidden');
         document.getElementById('successPanel').classList.remove('hidden');
       } catch (err) {
-        errEl.textContent = 'Connection error. Please try again.';
+        clearTimeout(slowHint);
+        errEl.textContent = 'Could not reach the server. Please refresh and try again.';
         errEl.classList.remove('hidden');
         btn.textContent = 'Start free trial';
         btn.disabled = false;

@@ -101,6 +101,9 @@
   </div>
 
   <script>
+    // Ping server on page load to wake it from Render free-tier sleep
+    fetch('/health').catch(() => {});
+
     // Auto-populate SSE URL
     document.getElementById('sseUrl').textContent = window.location.origin + '/sse';
 
@@ -123,15 +126,23 @@
       btn.textContent = 'Signing in...';
       btn.disabled = true;
 
+      const slowHint = setTimeout(() => {
+        if (btn.disabled) btn.textContent = 'Starting up server (~30s on first load)...';
+      }, 4000);
+
       try {
+        const controller = new AbortController();
+        setTimeout(() => controller.abort(), 55000);
         const res = await fetch('/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            email: document.getElementById('email').value,
+            email: document.getElementById('email').value.trim(),
             password: document.getElementById('password').value,
           }),
+          signal: controller.signal,
         });
+        clearTimeout(slowHint);
         const data = await res.json();
 
         if (!res.ok || data.error) {
@@ -142,7 +153,6 @@
           return;
         }
 
-        // Store in session
         sessionStorage.setItem('prepcast_token', data.bearer_token);
         sessionStorage.setItem('prepcast_email', data.email);
 
@@ -157,7 +167,8 @@
         document.getElementById('loginForm').classList.add('hidden');
         document.getElementById('tokenPanel').classList.remove('hidden');
       } catch (err) {
-        errEl.textContent = 'Connection error. Please try again.';
+        clearTimeout(slowHint);
+        errEl.textContent = 'Could not reach the server. Please refresh and try again.';
         errEl.classList.remove('hidden');
         btn.textContent = 'Sign in';
         btn.disabled = false;
