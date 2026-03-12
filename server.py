@@ -387,6 +387,16 @@ def create_app() -> web.Application:
         )
 
     app.router.add_get("/public-comparison.json", handle_public_comparison)
+
+    async def handle_science(_: web.Request) -> web.StreamResponse:
+        """Serve science page."""
+        science_path = site_dir / "science.html"
+        if science_path.exists():
+            return web.FileResponse(science_path)
+        return web.Response(status=404, text="Not found")
+
+    app.router.add_get("/science.html", handle_science)
+
     if site_dir.exists():
         app.router.add_static("/site/", site_dir, show_index=True)
 
