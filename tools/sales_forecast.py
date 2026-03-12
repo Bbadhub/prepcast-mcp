@@ -1,15 +1,8 @@
 """
 PrepCast — Sales Forecast Tool
 
-Given a location's historical daily sales data (loaded via upload_report),
-project revenue for a target date factoring in:
-  - Day-of-week baseline
-  - Recent trend (EMA)
-  - Known event multipliers (injected from events tool)
-
-Handlers:
-    forecast_sales  — project revenue + confidence range for a date
-    analyze_history — summarize patterns from stored sales data
+Given a location's historical daily sales data, project revenue for a target
+date factoring in day-of-week baseline, recent trend (EMA), and event multipliers.
 """
 
 import json
@@ -19,16 +12,11 @@ from datetime import datetime, date, timedelta
 from typing import Any, Dict, List, Optional
 from collections import defaultdict
 
-# ---------------------------------------------------------------------------
-# Storage path (same dir as signals, overridable via env)
-# ---------------------------------------------------------------------------
-
-DATA_DIR = os.environ.get("PREPCAST_DATA_DIR", "/data/prepcast")
+DATA_DIR = os.environ.get("PREPCAST_DATA_DIR", "/tmp/prepcast")
 SALES_FILE = os.path.join(DATA_DIR, "sales_history.json")
 
 
 def _load_sales() -> List[Dict]:
-    """Load stored sales records from disk."""
     if not os.path.exists(SALES_FILE):
         return []
     try:
@@ -39,11 +27,10 @@ def _load_sales() -> List[Dict]:
 
 
 def _day_name(dt: date) -> str:
-    return dt.strftime("%A")  # Monday, Tuesday...
+    return dt.strftime("%A")
 
 
 def _baseline_by_dow(records: List[Dict]) -> Dict[str, float]:
-    """Calculate average daily revenue grouped by day-of-week."""
     buckets: Dict[str, List[float]] = defaultdict(list)
     for r in records:
         try:
@@ -55,7 +42,6 @@ def _baseline_by_dow(records: List[Dict]) -> Dict[str, float]:
 
 
 def _recent_trend(records: List[Dict], days: int = 14) -> Optional[float]:
-    """EMA-based trend: returns multiplier vs overall mean (1.0 = flat)."""
     cutoff = date.today() - timedelta(days=days)
     recent = []
     for r in records:
@@ -72,56 +58,35 @@ def _recent_trend(records: List[Dict], days: int = 14) -> Optional[float]:
     return recent_mean / overall_mean if overall_mean else 1.0
 
 
-# ===========================================================================
-# Tool: forecast_sales
-# ===========================================================================
-
 FORECAST_SALES_TOOL = {
     "name": "forecast_sales",
     "description": (
-        "Forecast projected daily revenue for a given date at this location. "
-        "Uses historical sales patterns (day-of-week baseline + recent trend). "
-        "Optionally factor in a known event and its expected attendance to "
-        "adjust the projection. Returns projected revenue, confidence range, "
-        "and a plain-English summary."
+        "Forecast projected daily revenue for a given date. "
+        "Uses historical sales patterns (day-of-week baseline + recent EMA trend). "
+        "Optionally factor in a local event and its attendance to adjust the projection. "
+        "Returns projected revenue, confidence range, and plain-English summary."
     ),
     "inputSchema": {
         "type": "object",
         "properties": {
-            "target_date": {
-                "type": "string",
-                "description": "Date to forecast in YYYY-MM-DD format. Defaults to today.",
-            },
-            "event_name": {
-                "type": "string",
-                "description": "Optional: name of a known event nearby (e.g. 'volleyball tournament').",
-            },
-            "event_attendance": {
-                "type": "integer",
-                "description": "Optional: expected attendance for the event (e.g. 7000).",
-            },
-            "event_multiplier": {
-                "type": "number",
-                "description": (
-                    "Optional: manually override the event traffic multiplier "
-                    "(e.g. 1.4 = 40% more foot traffic). If omitted, estimated from attendance."
-                ),
-            },
+            "target_date": {"type": "string", "description": "Date to forecast YYYY-MM-DD. Defaults to today."},
+            "event_name": {"type": "string", "description": "Optional: nearby event name (e.g. 'volleyball tournament')."},
+            "event_attendance": {"type": "integer", "description": "Optional: expected event attendance."},
+            "event_multiplier": {"type": "number", "description": "Optional: manually override traffic multiplier (e.g. 1.45)."},
         },
         "required": [],
     },
 }
 
 
-async def handle_forecast_sales(
-    target_date: str = "",
-    event_name: str = "",
-    event_attendance: int = 0,
-    event_multiplier: float = 0.0,
-) -> str:
+async def handle_forecast_sales(arguments: dict) -> str:
+    target_date = arguments.get("target_date", "")
+    event_name = arguments.get("event_name", "")
+    event_attendance = int(arguments.get("event_attendance", 0))
+    event_multiplier = float(arguments.get("event_multiplier", 0.0))
+
     records = _load_sales()
 
-    # Parse target date
     try:
         td = date.fromisoformat(target_date) if target_date else date.today()
     except ValueError:
@@ -131,36 +96,30 @@ async def handle_forecast_sales(
 
     if not records:
         return (
-            "No sales history loaded yet. Use upload_report to import your daily sales spreadsheets first."
+            "No sales history loaded yet.\n"
+            "Use upload_sales_csv to import your daily sales data, "
+            "or log_daily_sales to add days manually.\n\n"
+            "Tip: Even a few weeks of data gives you a useful baseline."
         )
 
     baselines = _baseline_by_dow(records)
     base = baselines.get(dow)
 
     if base is None:
-        return (
-            f"No historical data for {dow}s yet. Upload more sales reports to build a baseline."
-        )
+        return f"No historical data for {dow}s yet. Upload more sales reports to build a baseline."
 
-    # Apply recent trend
     trend = _recent_trend(records)
     projected = base * (trend if trend else 1.0)
 
-    # Apply event multiplier
     event_note = ""
     if event_multiplier and event_multiplier > 0:
         projected *= event_multiplier
         event_note = f"Event multiplier applied: {event_multiplier:.2f}x"
     elif event_attendance and event_attendance > 0:
-        # Rough heuristic: 1000 attendees ≈ +5% foot traffic up to +60%
         est_mult = min(1.0 + (event_attendance / 1000) * 0.05, 1.60)
         projected *= est_mult
-        event_note = (
-            f"Event '{event_name}' ({event_attendance:,} attendees) → "
-            f"estimated {est_mult:.2f}x multiplier applied."
-        )
+        event_note = f"Event '{event_name}' ({event_attendance:,} attendees) → {est_mult:.2f}x multiplier"
 
-    # Confidence range ±12% (typical fast-food daily variance)
     all_vals = [float(r["revenue"]) for r in records if "revenue" in r]
     if len(all_vals) >= 10:
         stdev = statistics.stdev(all_vals)
@@ -177,48 +136,42 @@ async def handle_forecast_sales(
         f"  Projected Revenue:  ${projected:,.0f}",
         f"  Confidence Range:   ${low:,.0f} – ${high:,.0f}  (±{variance_pct:.0f}%)",
         f"  {dow} Baseline:      ${base:,.0f}",
-        f"  Recent Trend:       {'%.2fx' % trend if trend else 'not enough data'}",
+        f"  Recent Trend:       {'%.2fx' % trend if trend else 'not enough data yet'}",
     ]
     if event_note:
         lines.append(f"  {event_note}")
     lines += [
         f"",
         f"Based on {len(records)} days of sales history.",
+        f"Run generate_prep_list with projected_revenue={projected:.0f} to get your prep list.",
     ]
     return "\n".join(lines)
 
-
-# ===========================================================================
-# Tool: analyze_history
-# ===========================================================================
 
 ANALYZE_HISTORY_TOOL = {
     "name": "analyze_history",
     "description": (
         "Analyze uploaded sales history to surface patterns: best/worst days, "
-        "average revenue by day-of-week, busiest weeks, and overall trend. "
+        "average revenue by day-of-week, and overall trend. "
         "Run this after uploading reports to understand your baseline."
     ),
     "inputSchema": {
         "type": "object",
         "properties": {
-            "weeks": {
-                "type": "integer",
-                "description": "How many weeks of history to analyze (default: all).",
-            },
+            "weeks": {"type": "integer", "description": "How many weeks of history to analyze (default: all)."},
         },
         "required": [],
     },
 }
 
 
-async def handle_analyze_history(weeks: int = 0) -> str:
+async def handle_analyze_history(arguments: dict) -> str:
+    weeks = int(arguments.get("weeks", 0))
     records = _load_sales()
 
     if not records:
-        return "No sales history found. Use upload_report to import your spreadsheets."
+        return "No sales history found. Use upload_sales_csv to import your spreadsheets."
 
-    # Filter by weeks if requested
     if weeks and weeks > 0:
         cutoff = date.today() - timedelta(weeks=weeks)
         records = [r for r in records if date.fromisoformat(r["date"]) >= cutoff]
@@ -255,10 +208,6 @@ async def handle_analyze_history(weeks: int = 0) -> str:
     ]
     return "\n".join(lines)
 
-
-# ===========================================================================
-# Exports
-# ===========================================================================
 
 TOOLS = [FORECAST_SALES_TOOL, ANALYZE_HISTORY_TOOL]
 

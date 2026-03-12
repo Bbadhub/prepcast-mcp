@@ -71,17 +71,17 @@ GET_STATUS_TOOL = {
 _start_time = datetime.now(timezone.utc)
 
 
-async def handle_echo(text: str = "") -> str:
-    """Echo handler - returns the input text unchanged."""
-    return text
+async def handle_echo(arguments: dict) -> str:
+    return arguments.get("text", "")
 
 
-async def handle_hello_world(name: str = "World", message: str = "Hello") -> str:
-    """Hello world handler - greets a person by name."""
-    return f"{message}, {name}! Welcome to the MCP server."
+async def handle_hello_world(arguments: dict) -> str:
+    name = arguments.get("name", "World")
+    message = arguments.get("message", "Hello")
+    return f"{message}, {name}! Welcome to PrepCast."
 
 
-async def handle_get_status() -> str:
+async def handle_get_status(arguments: dict) -> str:
     """Status handler - returns server information."""
     now = datetime.now(timezone.utc)
     uptime = now - _start_time

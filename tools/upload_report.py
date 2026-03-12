@@ -2,18 +2,12 @@
 PrepCast — Upload Report Tool
 
 Ingests daily sales reports from CSV or plain-text paste.
-Normalizes to a standard record format and appends to sales_history.json.
+Normalizes to {date, revenue} records and appends to sales_history.json.
 
-Supported input formats:
-  1. CSV text paste (date, revenue columns)
-  2. Simple "date: $amount" line format (easy manual entry)
+Supported formats:
+  1. CSV with date + revenue columns (auto-detected)
+  2. "date: $amount" line format
   3. JSON array of {date, revenue} objects
-
-Handlers:
-    upload_sales_csv    — ingest CSV/text sales data
-    log_daily_sales     — log a single day manually
-    get_sales_summary   — quick summary of stored history
-    clear_sales_history — wipe and start fresh
 """
 
 import csv
@@ -24,11 +18,7 @@ import re
 from datetime import date, datetime
 from typing import Dict, List, Optional, Tuple
 
-# ---------------------------------------------------------------------------
-# Storage
-# ---------------------------------------------------------------------------
-
-DATA_DIR = os.environ.get("PREPCAST_DATA_DIR", "/data/prepcast")
+DATA_DIR = os.environ.get("PREPCAST_DATA_DIR", "/tmp/prepcast")
 SALES_FILE = os.path.join(DATA_DIR, "sales_history.json")
 
 
@@ -44,7 +34,6 @@ def _load_sales() -> List[Dict]:
 
 def _save_sales(records: List[Dict]):
     os.makedirs(DATA_DIR, exist_ok=True)
-    # Sort by date ascending, deduplicate by date (keep last)
     by_date = {}
     for r in records:
         by_date[r["date"]] = r
@@ -54,7 +43,6 @@ def _save_sales(records: List[Dict]):
 
 
 def _parse_date(s: str) -> Optional[str]:
-    """Try multiple date formats, return ISO string or None."""
     s = s.strip().strip('"').strip("'")
     formats = [
         "%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y",
@@ -71,7 +59,6 @@ def _parse_date(s: str) -> Optional[str]:
 
 
 def _parse_revenue(s: str) -> Optional[float]:
-    """Strip $, commas, whitespace from revenue string."""
     s = re.sub(r"[$,\s]", "", s.strip())
     try:
         return float(s)
@@ -80,21 +67,13 @@ def _parse_revenue(s: str) -> Optional[float]:
 
 
 def _parse_csv(text: str) -> Tuple[List[Dict], List[str]]:
-    """
-    Parse CSV text into records.
-    Auto-detects date + revenue columns.
-    Returns (records, errors).
-    """
     records = []
     errors = []
-
     reader = csv.reader(io.StringIO(text.strip()))
     rows = list(reader)
-
     if not rows:
-        return [], ["No data found in CSV."]
+        return [], ["No data found."]
 
-    # Find header row — look for columns containing "date" and "revenue"/"sales"/"amount"
     header = None
     header_idx = 0
     date_col = None
@@ -111,13 +90,11 @@ def _parse_csv(text: str) -> Tuple[List[Dict], List[str]]:
             rev_col = r_candidates[0]
             break
 
-    # No header found — assume first col is date, second is revenue
     if date_col is None:
         date_col, rev_col = 0, 1
         header_idx = 0
-        # Check if first row looks like a header
         if rows and not _parse_date(rows[0][0] if rows[0] else ""):
-            header_idx = 1  # skip header row
+            header_idx = 1
 
     data_rows = rows[header_idx + (1 if header else 0):]
 
@@ -146,32 +123,24 @@ def _parse_csv(text: str) -> Tuple[List[Dict], List[str]]:
     return records, errors
 
 
-# ===========================================================================
-# Tool: upload_sales_csv
-# ===========================================================================
-
 UPLOAD_SALES_CSV_TOOL = {
     "name": "upload_sales_csv",
     "description": (
         "Import daily sales history from a CSV or text paste. "
-        "Paste the contents of your spreadsheet directly — "
-        "the tool auto-detects date and revenue columns. "
-        "Supports formats: CSV, tab-separated, or 'date: $amount' lines. "
-        "Merges with existing history (duplicates by date are overwritten)."
+        "Paste your spreadsheet contents directly — the tool auto-detects date and revenue columns. "
+        "Merges with existing history (duplicates by date are overwritten). "
+        "After uploading, run analyze_history to see patterns."
     ),
     "inputSchema": {
         "type": "object",
         "properties": {
             "csv_text": {
                 "type": "string",
-                "description": (
-                    "Raw CSV or text content of your sales report. "
-                    "Example: 'Date,Revenue\\n2025-01-01,$6200\\n2025-01-02,$5800'"
-                ),
+                "description": "Raw CSV content. Example: 'Date,Revenue\\n2025-01-01,6200\\n2025-01-02,5800'",
             },
             "location_name": {
                 "type": "string",
-                "description": "Optional location label (e.g. 'Overland Park 163rd'). Stored with records.",
+                "description": "Optional location label (e.g. 'Overland Park 163rd').",
             },
         },
         "required": ["csv_text"],
@@ -179,14 +148,15 @@ UPLOAD_SALES_CSV_TOOL = {
 }
 
 
-async def handle_upload_sales_csv(csv_text: str = "", location_name: str = "") -> str:
+async def handle_upload_sales_csv(arguments: dict) -> str:
+    csv_text = arguments.get("csv_text", "")
+    location_name = arguments.get("location_name", "")
+
     if not csv_text or not csv_text.strip():
         return "csv_text is required. Paste your spreadsheet contents."
 
-    # Try CSV first
     records, errors = _parse_csv(csv_text)
 
-    # If CSV parse got nothing, try "date: $amount" line format
     if not records:
         line_records = []
         for line in csv_text.strip().splitlines():
@@ -202,12 +172,11 @@ async def handle_upload_sales_csv(csv_text: str = "", location_name: str = "") -
 
     if not records:
         return (
-            "Could not parse any records from the input.\n"
-            "Expected format: CSV with Date and Revenue columns, or lines like '01/15/2025, $6200'\n"
+            "Could not parse any records.\n"
+            "Expected: CSV with Date and Revenue columns, or lines like '01/15/2025, $6200'\n"
             + ("\nErrors:\n" + "\n".join(errors[:5]) if errors else "")
         )
 
-    # Add location tag if provided
     if location_name:
         for r in records:
             r["location"] = location_name
@@ -215,8 +184,8 @@ async def handle_upload_sales_csv(csv_text: str = "", location_name: str = "") -
     existing = _load_sales()
     combined = existing + records
     _save_sales(combined)
-
     final = _load_sales()
+
     return (
         f"Imported {len(records)} records.\n"
         f"  Date range: {records[0]['date']} → {records[-1]['date']}\n"
@@ -226,46 +195,34 @@ async def handle_upload_sales_csv(csv_text: str = "", location_name: str = "") -
     )
 
 
-# ===========================================================================
-# Tool: log_daily_sales
-# ===========================================================================
-
 LOG_DAILY_SALES_TOOL = {
     "name": "log_daily_sales",
-    "description": (
-        "Log a single day's actual sales. Use this at end of day to keep "
-        "history current. Overwrites any existing entry for the same date."
-    ),
+    "description": "Log a single day's actual sales. Use at end of day to keep history current.",
     "inputSchema": {
         "type": "object",
         "properties": {
-            "date": {
-                "type": "string",
-                "description": "Date in YYYY-MM-DD or MM/DD/YYYY format.",
-            },
-            "revenue": {
-                "type": "number",
-                "description": "Total revenue for the day in dollars.",
-            },
-            "notes": {
-                "type": "string",
-                "description": "Optional notes (e.g. 'ran out of bacon mid-day', 'big volleyball tournament').",
-            },
+            "date": {"type": "string", "description": "Date in YYYY-MM-DD or MM/DD/YYYY format."},
+            "revenue": {"type": "number", "description": "Total revenue for the day in dollars."},
+            "notes": {"type": "string", "description": "Optional notes (e.g. 'ran out of bacon', 'big tournament')."},
         },
         "required": ["date", "revenue"],
     },
 }
 
 
-async def handle_log_daily_sales(date: str = "", revenue: float = 0, notes: str = "") -> str:
-    if not date or not revenue:
+async def handle_log_daily_sales(arguments: dict) -> str:
+    date_str = arguments.get("date", "")
+    revenue = arguments.get("revenue", 0)
+    notes = arguments.get("notes", "")
+
+    if not date_str or not revenue:
         return "date and revenue are required."
 
-    parsed_date = _parse_date(date)
+    parsed_date = _parse_date(str(date_str))
     if not parsed_date:
-        return f"Could not parse date '{date}'. Use YYYY-MM-DD or MM/DD/YYYY."
+        return f"Could not parse date '{date_str}'. Use YYYY-MM-DD or MM/DD/YYYY."
 
-    record = {"date": parsed_date, "revenue": revenue}
+    record = {"date": parsed_date, "revenue": float(revenue)}
     if notes:
         record["notes"] = notes
 
@@ -275,28 +232,20 @@ async def handle_log_daily_sales(date: str = "", revenue: float = 0, notes: str 
     final = _load_sales()
 
     return (
-        f"Logged: {parsed_date}  ${revenue:,.0f}"
+        f"Logged: {parsed_date}  ${float(revenue):,.0f}"
         + (f"  ({notes})" if notes else "")
         + f"\nTotal history: {len(final)} days."
     )
 
 
-# ===========================================================================
-# Tool: get_sales_summary
-# ===========================================================================
-
 GET_SALES_SUMMARY_TOOL = {
     "name": "get_sales_summary",
     "description": "Quick summary of how much sales history is loaded and what date range it covers.",
-    "inputSchema": {
-        "type": "object",
-        "properties": {},
-        "required": [],
-    },
+    "inputSchema": {"type": "object", "properties": {}, "required": []},
 }
 
 
-async def handle_get_sales_summary() -> str:
+async def handle_get_sales_summary(arguments: dict) -> str:
     records = _load_sales()
     if not records:
         return (
@@ -309,19 +258,15 @@ async def handle_get_sales_summary() -> str:
 
     return (
         f"SALES HISTORY SUMMARY\n"
-        f"  Records:      {len(records)} days\n"
-        f"  Date range:   {dates[0]} → {dates[-1]}\n"
-        f"  Avg revenue:  ${sum(revenues)/len(revenues):,.0f}/day\n"
+        f"  Records:       {len(records)} days\n"
+        f"  Date range:    {dates[0]} → {dates[-1]}\n"
+        f"  Avg revenue:   ${sum(revenues)/len(revenues):,.0f}/day\n"
         f"  Total revenue: ${sum(revenues):,.0f}\n"
-        f"  Min day:       ${min(revenues):,.0f}\n"
-        f"  Max day:       ${max(revenues):,.0f}\n\n"
+        f"  Best day:      ${max(revenues):,.0f}\n"
+        f"  Worst day:     ${min(revenues):,.0f}\n\n"
         f"Run analyze_history for day-of-week breakdown."
     )
 
-
-# ===========================================================================
-# Exports
-# ===========================================================================
 
 TOOLS = [UPLOAD_SALES_CSV_TOOL, LOG_DAILY_SALES_TOOL, GET_SALES_SUMMARY_TOOL]
 

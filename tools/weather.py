@@ -97,7 +97,7 @@ TOOL_GET_WEATHER_FORECAST = {
 }
 
 
-async def handle_get_weather_forecast(arguments: dict[str, Any]) -> dict:
+async def handle_get_weather_forecast(arguments: dict) -> dict:
     target_date = arguments.get("date") or date.today().isoformat()
     lat = float(arguments.get("lat") or DEFAULT_LAT)
     lon = float(arguments.get("lon") or DEFAULT_LON)
