@@ -490,11 +490,11 @@ def create_billing_middleware(tracker: UsageTracker):
         success = True
         error_msg = ""
         try:
-            result = await handler(**arguments)
+            result = await handler(arguments)
         except Exception as e:
             success = False
             error_msg = str(e)
-            result = f"Error: {error_msg}"
+            result = {"content": [{"type": "text", "text": f"Error: {error_msg}"}]}
 
         duration_ms = (time.time() - start) * 1000
         tracker.record_usage(
@@ -504,7 +504,10 @@ def create_billing_middleware(tracker: UsageTracker):
             success=success,
             error=error_msg,
         )
-        return {"content": [{"type": "text", "text": result}]}
+        # Handlers return either a string or already-formatted {"content": [...]} dict
+        if isinstance(result, dict):
+            return result
+        return {"content": [{"type": "text", "text": str(result)}]}
 
     return middleware
 
