@@ -309,61 +309,168 @@
     <div class="max-w-3xl mx-auto">
       <div class="text-center mb-12">
         <h2 class="text-4xl font-black tracking-tight mb-4 text-gray-900">See it in action</h2>
-        <p class="text-gray-500 text-lg">This is a real conversation with PrepCast through Claude.</p>
+        <p class="text-gray-500 text-lg">Real conversations with PrepCast through Claude. Five Guys Overland Park, KS.</p>
       </div>
 
-      <div class="card p-6 space-y-4">
+      <!-- Tab bar -->
+      <div class="flex gap-2 mb-4">
+        <button onclick="showTab('store')" id="tab-store"
+          class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold bg-indigo-600 text-white">
+          Store Manager
+        </button>
+        <button onclick="showTab('corporate')" id="tab-corporate"
+          class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold bg-white border border-gray-200 text-gray-600 hover:border-indigo-300">
+          Corporate View
+        </button>
+      </div>
 
-        <!-- User message -->
+      <!-- Store manager demo -->
+      <div id="demo-store" class="card p-6 space-y-5">
+
         <div class="flex justify-end">
           <div class="chat-bubble-user">
-            Saturday we have a volleyball tournament at Blue Hawk — about 6,000 people. What's my prep list?
+            Saturday we have a volleyball tournament at AdventHealth Sports Park — 6,200 attendees. What's my prep list?
           </div>
         </div>
 
-        <!-- AI response -->
         <div class="flex justify-start">
           <div class="chat-bubble-ai">
-            <div class="text-orange-600 font-bold mb-2 not-italic" style="font-family: Inter, sans-serif; font-size: 0.8rem;">PrepCast</div>
-            <div class="text-green-700 font-semibold">FORECAST — Saturday</div>
-            <div>  Revenue:  <strong>$7,420</strong>  (range $6,500–$8,340)</div>
-            <div>  Volleyball 6k → <span class="text-orange-600">1.45x multiplier</span></div>
-            <div class="border-t border-orange-200 my-2"></div>
-            <div class="text-green-700 font-semibold">PREP LIST  +15% event buffer</div>
-            <div>  Patties       <strong>238</strong>  · 3 cases · ~$1,500</div>
-            <div>  Bacon strips  <strong>330</strong>  · 40% bacon burger est.</div>
-            <div>  Hot dogs      <strong>158</strong></div>
-            <div>  Grilled chse  <strong>105</strong></div>
-            <div>  Burger buns   <strong>238</strong>  · Hotdog buns  <strong>158</strong></div>
-            <div>  Cheese slices <strong>298</strong></div>
+            <div class="text-indigo-600 font-bold mb-2 not-italic" style="font-family: Inter, sans-serif; font-size: 0.75rem; letter-spacing: 0.05em;">PREPCAST</div>
+            <div><strong>SALES FORECAST — Saturday, June 14</strong></div>
+            <div class="mt-1">  Projected Revenue:  <strong>$9,177</strong></div>
+            <div>  Confidence Range:   $7,900 – $10,450  (+/-15%)</div>
+            <div>  Saturday Baseline:  $6,330</div>
+            <div>  Recent Trend:       1.03x  (business up slightly)</div>
+            <div>  Event: volleyball 6,200 attendees  ->  <strong style="color:#4f46e5">1.45x multiplier</strong></div>
+            <div class="border-t border-indigo-100 my-3"></div>
+            <div><strong>FIVE GUYS PREP LIST — Saturday  (event +15% buffer applied)</strong></div>
+            <div class="mt-1 font-semibold text-xs text-gray-400 uppercase tracking-wide">BEEF PATTIES</div>
+            <div>  Total patties:       <strong>1,109</strong>  (3.3 oz each, fresh never frozen)</div>
+            <div>  Standard burgers:    611  (2 patties)  =  305 sandwiches</div>
+            <div>  Little burgers:      388  (1 patty)    =  388 sandwiches</div>
+            <div>  Cases needed:        <strong>9.3 cases</strong>  @120 patties/case  →  order 10</div>
+            <div>  Case cost:           ~<strong>$893</strong>  @$89.50/case</div>
+            <div class="mt-1 font-semibold text-xs text-gray-400 uppercase tracking-wide">BACON (Applewood smoked, 2 strips/burger)</div>
+            <div>  Bacon burgers:       153  (50% of standard)</div>
+            <div>  Bacon dogs:           16  (40% of hot dogs)</div>
+            <div>  BLTs:                  3  (6 strips each)</div>
+            <div>  Total strips:        <strong>364</strong></div>
+            <div>  Cases needed:        <strong>1.5 cases</strong>  @240 strips/case  →  order 2</div>
+            <div>  Case cost:           ~<strong>$110</strong>  @$55/case</div>
+            <div class="mt-1 font-semibold text-xs text-gray-400 uppercase tracking-wide">HOT DOGS (Hebrew National, split lengthwise)</div>
+            <div>  Hot dogs:            <strong>40</strong>  (4 per 100 customers est.)</div>
+            <div>  Cases needed:        1 case  @48/case  →  order 1</div>
+            <div>  Case cost:           ~<strong>$35</strong></div>
+            <div class="mt-1 font-semibold text-xs text-gray-400 uppercase tracking-wide">FRIES (double-fried Burbank potatoes, peanut oil)</div>
+            <div>  Fry portions:        <strong>487</strong>  (one portion per ~18.8 customers)</div>
+            <div>  Raw potato weight:   <strong>438 lbs</strong>  @0.90 lb/portion</div>
+            <div>  50-lb bags:          <strong>8.8 bags</strong>  →  order 9  @$22/bag</div>
+            <div>  Bag cost:            ~<strong>$198</strong></div>
+            <div class="mt-1 font-semibold text-xs text-gray-400 uppercase tracking-wide">TOPPINGS (active prep required)</div>
+            <div>  Grilled onions:      <strong>174 portions</strong>  (~2 lbs raw/10 portions)</div>
+            <div>  Grilled mushrooms:   <strong>97 portions</strong>  (~1.5 lbs raw/10 portions)</div>
+            <div class="mt-1 font-semibold text-xs text-gray-400 uppercase tracking-wide">BUNS</div>
+            <div>  Burger buns:         <strong>693</strong>  (standard + little burgers + grilled cheese)</div>
+            <div>  Hot dog buns:         <strong>40</strong></div>
+            <div class="border-t border-indigo-100 my-2"></div>
+            <div>  <strong>Total estimated food cost:  ~$1,448</strong></div>
+            <div class="text-xs text-gray-400 mt-1">Based on 87 days of sales history. Run get_weather_forecast for Saturday before you finalize.</div>
           </div>
         </div>
 
-        <!-- User followup -->
         <div class="flex justify-end">
           <div class="chat-bubble-user">
-            What about a normal Wednesday? No events.
+            How did last Saturday's forecast compare to what we actually did?
           </div>
         </div>
 
-        <!-- AI response 2 -->
         <div class="flex justify-start">
           <div class="chat-bubble-ai">
-            <div class="text-orange-600 font-bold mb-2 not-italic" style="font-family: Inter, sans-serif; font-size: 0.8rem;">PrepCast</div>
-            <div class="text-green-700 font-semibold">FORECAST — Wednesday (baseline)</div>
-            <div>  Revenue:  <strong>$4,100</strong>  (range $3,700–$4,500)</div>
-            <div class="border-t border-orange-200 my-2"></div>
-            <div class="text-green-700 font-semibold">PREP LIST  +10% buffer</div>
-            <div>  Patties       <strong>132</strong>  · 1.7 cases · ~$850</div>
-            <div>  Bacon strips  <strong>183</strong></div>
-            <div>  Hot dogs       <strong>88</strong></div>
-            <div>  Grilled chse   <strong>59</strong></div>
+            <div class="text-indigo-600 font-bold mb-2 not-italic" style="font-family: Inter, sans-serif; font-size: 0.75rem; letter-spacing: 0.05em;">PREPCAST</div>
+            <div><strong>FORECAST ACCURACY — June 7 (last Saturday)</strong></div>
+            <div class="mt-1">  Forecast:   $8,340</div>
+            <div>  Actual:     <strong>$8,720</strong></div>
+            <div>  Error:      $380  (<strong>4.6%</strong>)  — within target range</div>
+            <div>  Direction:  Actual ran OVER forecast  (you prepped light by ~$380)</div>
+            <div class="mt-2 text-xs" style="color:#4f46e5">Overall accuracy (last 12 forecasts): <strong>91.2%</strong></div>
+            <div class="text-xs text-gray-400">Tip: Log today's actuals with log_daily_sales to keep your accuracy score current.</div>
           </div>
         </div>
 
       </div>
+
+      <!-- Corporate demo -->
+      <div id="demo-corporate" class="hidden card p-6 space-y-5">
+
+        <div class="flex justify-end">
+          <div class="chat-bubble-user">
+            Compare all my Five Guys locations — which one is performing best and which needs attention?
+          </div>
+        </div>
+
+        <div class="flex justify-start">
+          <div class="chat-bubble-ai">
+            <div class="text-indigo-600 font-bold mb-2 not-italic" style="font-family: Inter, sans-serif; font-size: 0.75rem; letter-spacing: 0.05em;">PREPCAST</div>
+            <div><strong>LOCATION COMPARISON — 4 stores</strong></div>
+            <div class="mt-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Revenue (30-day avg)</div>
+            <div class="font-mono text-xs mt-1">
+              <div>  1. Overland Park 163rd    $7,840/day   +6.2%  [Sat best]</div>
+              <div>  2. Lenexa 87th St         $6,920/day   +1.8%  [Sat best]</div>
+              <div>  3. KC Plaza               $6,105/day   -3.4%  [Fri best]</div>
+              <div>  4. Olathe Santa Fe        $5,230/day   -8.1%  [Sat best]</div>
+            </div>
+            <div class="mt-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Forecast Accuracy</div>
+            <div class="font-mono text-xs mt-1">
+              <div>  Overland Park 163rd   91.2%  (28 comparisons)</div>
+              <div>  Lenexa 87th St        88.7%  (22 comparisons)</div>
+              <div>  KC Plaza              84.1%  (19 comparisons)</div>
+              <div>  Olathe Santa Fe       N/A    (no forecast log yet)</div>
+            </div>
+            <div class="border-t border-indigo-100 my-2"></div>
+            <div class="text-xs"><strong>Needs attention:</strong> Olathe Santa Fe is down 8.1% vs prior month and has no forecast logging. KC Plaza is also trending negative. Recommend reviewing event calendar for both — Blue Hawk proximity drives 35-45% weekend lift at OP 163rd but those stores may be missing similar opportunities.</div>
+            <div class="text-xs text-gray-400 mt-1">Use get_performance_report for any individual store, or get_revenue_trends for month-over-month breakdown.</div>
+          </div>
+        </div>
+
+        <div class="flex justify-end">
+          <div class="chat-bubble-user">
+            Show me the monthly revenue trend for Olathe — is this a new problem or has it been declining?
+          </div>
+        </div>
+
+        <div class="flex justify-start">
+          <div class="chat-bubble-ai">
+            <div class="text-indigo-600 font-bold mb-2 not-italic" style="font-family: Inter, sans-serif; font-size: 0.75rem; letter-spacing: 0.05em;">PREPCAST</div>
+            <div><strong>REVENUE TRENDS — Olathe Santa Fe</strong></div>
+            <div class="font-mono text-xs mt-2">
+              <div>  2026-01    ####################    $168,400  (+2.1%)</div>
+              <div>  2026-02    ####################    $165,200  (-1.9%)</div>
+              <div>  2026-03    ###################     $158,900  (-3.8%)</div>
+              <div>  2026-04    ##################      $152,600  (-4.0%)</div>
+              <div>  2026-05    #################       $145,100  (-4.9%)</div>
+              <div>  2026-06    ###############         $131,300  (-9.5% MTD)</div>
+            </div>
+            <div class="mt-2 text-xs"><strong>Trend:</strong> This is not new — revenue has declined every month since January. Total drop of 22% over 5 months. Saturdays average $5,820 vs $7,210 in January. The June acceleration suggests something changed recently (new competition? staffing? hours?). Worth investigating before assuming prep changes will help.</div>
+          </div>
+        </div>
+
+      </div>
+
     </div>
   </section>
+
+  <script>
+    function showTab(tab) {
+      document.getElementById('demo-store').classList.toggle('hidden', tab !== 'store');
+      document.getElementById('demo-corporate').classList.toggle('hidden', tab !== 'corporate');
+      document.getElementById('tab-store').className = tab === 'store'
+        ? 'tab-btn px-4 py-2 rounded-lg text-sm font-semibold bg-indigo-600 text-white'
+        : 'tab-btn px-4 py-2 rounded-lg text-sm font-semibold bg-white border border-gray-200 text-gray-600 hover:border-indigo-300';
+      document.getElementById('tab-corporate').className = tab === 'corporate'
+        ? 'tab-btn px-4 py-2 rounded-lg text-sm font-semibold bg-indigo-600 text-white'
+        : 'tab-btn px-4 py-2 rounded-lg text-sm font-semibold bg-white border border-gray-200 text-gray-600 hover:border-indigo-300';
+    }
+  </script>
 
   <!-- WHY PREPCAST -->
   <section class="py-24 px-6 bg-white">

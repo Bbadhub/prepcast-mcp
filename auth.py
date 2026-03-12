@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Dict, Optional
 
 from aiohttp import web
+from store import slugify
 
 DATA_DIR = Path(os.environ.get("PREPCAST_DATA_DIR", "/tmp/prepcast"))
 USERS_FILE = DATA_DIR / "users.json"
@@ -97,6 +98,11 @@ def add_auth_routes(app: web.Application, usage_tracker):
         password = data.get("password") or ""
         name = (data.get("name") or "").strip()
         location_name = (data.get("location_name") or "").strip()
+        role = (data.get("role") or "store").strip().lower()
+        # Only allow corporate role if a secret is provided
+        corporate_secret = os.environ.get("CORPORATE_SIGNUP_SECRET", "")
+        if role == "corporate" and data.get("corporate_secret", "") != corporate_secret:
+            role = "store"
 
         if not email or "@" not in email:
             return web.json_response({"error": "Valid email required"}, status=400)
@@ -107,6 +113,7 @@ def add_auth_routes(app: web.Application, usage_tracker):
         if email in users:
             return web.json_response({"error": "Account already exists"}, status=409)
 
+        location_id = slugify(location_name) if location_name else slugify(email.split("@")[0])
         created_at = datetime.utcnow().isoformat()
         trial_expires_at = _trial_expires_at(created_at)
 
@@ -121,6 +128,8 @@ def add_auth_routes(app: web.Application, usage_tracker):
             "email": email,
             "name": name,
             "location_name": location_name,
+            "location_id": location_id,
+            "role": role,
             "password_hash": _hash_password(password),
             "api_key": api_key_obj.key,
             "created_at": created_at,
@@ -135,6 +144,9 @@ def add_auth_routes(app: web.Application, usage_tracker):
             "ok": True,
             "email": email,
             "name": name,
+            "location_id": location_id,
+            "location_name": location_name,
+            "role": role,
             "api_key": api_key_obj.key,
             "bearer_token": api_key_obj.key,
             "trial_days_remaining": TRIAL_DAYS,
@@ -181,10 +193,12 @@ def add_auth_routes(app: web.Application, usage_tracker):
             "api_key": user["api_key"],
             "bearer_token": user["api_key"],
             "tier": user.get("tier", "trial"),
+            "role": user.get("role", "store"),
+            "location_id": user.get("location_id", "default"),
+            "location_name": user.get("location_name", ""),
             "trial_active": trial_active,
             "trial_days_remaining": days_left,
             "trial_expires_at": user.get("trial_expires_at", ""),
-            "location_name": user.get("location_name", ""),
         })
 
     async def handle_me(request: web.Request) -> web.Response:
