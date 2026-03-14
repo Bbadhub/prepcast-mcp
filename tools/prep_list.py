@@ -22,7 +22,7 @@ Handlers:
 """
 
 from typing import Any, Dict, List
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import statistics
 
 # ---------------------------------------------------------------------------
@@ -133,35 +133,125 @@ def _save_ratios(ratios: Dict, location_id: str = "default"):
 GENERATE_PREP_LIST_TOOL = {
     "name": "generate_prep_list",
     "description": (
-        "Generate a Five Guys daily prep list from a projected revenue figure. "
-        "Returns quantities in bulk units the crew actually uses: cases of beef, "
-        "sheets of bacon, sleeves of cheese, bags of potatoes. "
-        "Rounded to quarter-unit increments. Over-prep carries to next day. "
-        "Add a buffer percentage for event days to avoid running out."
+        "Generate a Five Guys daily prep list. If no projected_revenue is given, "
+        "the system auto-forecasts from your sales history (day-of-week patterns, "
+        "recent trends) and checks weather to adjust. Returns quantities in bulk "
+        "units: cases of beef, sheets of bacon, sleeves of cheese, bags of potatoes. "
+        "Rounded to quarter-unit increments. Over-prep carries to next day."
     ),
     "inputSchema": {
         "type": "object",
         "properties": {
             "projected_revenue": {
                 "type": "number",
-                "description": "Projected daily revenue in dollars (e.g. 6200).",
+                "description": "Projected daily revenue in dollars. Leave blank to auto-forecast from sales history.",
             },
             "buffer_pct": {
                 "type": "number",
-                "description": "Safety buffer % to add (default: 10). Use 15-20 for event days.",
+                "description": "Safety buffer % to add (default: 10). Auto-increases for events/bad weather.",
             },
             "date": {
                 "type": "string",
-                "description": "Date for this prep list YYYY-MM-DD (optional, for records).",
+                "description": "Date for this prep list YYYY-MM-DD. Defaults to tomorrow.",
             },
             "notes": {
                 "type": "string",
                 "description": "Optional notes (e.g. 'volleyball tournament 7k attendees').",
             },
         },
-        "required": ["projected_revenue"],
+        "required": [],
     },
 }
+
+
+# ---------------------------------------------------------------------------
+# Auto-forecast: pull revenue from sales history + weather + events
+# ---------------------------------------------------------------------------
+
+def _auto_forecast_revenue(target_date: date, location_id: str) -> Dict:
+    """
+    Use sales history to auto-forecast revenue for a target date.
+    Returns dict with 'revenue', 'method', 'weather', 'event_multiplier', etc.
+    """
+    from tools.sales_forecast import _load_sales, _recency_weighted_forecast, _baseline_by_dow, _recent_trend
+
+    records = _load_sales(location_id)
+    result = {
+        "revenue": None,
+        "method": "none",
+        "weather_condition": None,
+        "weather_multiplier": 1.0,
+        "event_multiplier": 1.0,
+        "notes": [],
+    }
+
+    if not records:
+        return result
+
+    dow = target_date.strftime("%A")
+
+    # Primary: recency-weighted (same method as forecast_sales)
+    projected = _recency_weighted_forecast(records, dow, target_date)
+    baselines = _baseline_by_dow(records)
+    base = baselines.get(dow)
+
+    if projected is not None:
+        result["revenue"] = projected
+        result["method"] = f"history-weighted ({dow})"
+        result["notes"].append(f"{dow} baseline: ${base:,.0f}" if base else f"Using recency model")
+    elif base:
+        trend = _recent_trend(records)
+        projected = base * (trend if trend else 1.0)
+        result["revenue"] = projected
+        result["method"] = f"DOW baseline + trend"
+    else:
+        # Fallback: overall average
+        all_vals = [float(r["revenue"]) for r in records if "revenue" in r]
+        if all_vals:
+            result["revenue"] = statistics.mean(all_vals)
+            result["method"] = "overall average (thin history)"
+
+    if result["revenue"] is None:
+        return result
+
+    # --- Weather adjustment ---
+    try:
+        from tools.weather import _fetch_weather, _condition_from_wmo, WEATHER_MULTIPLIERS, DEFAULT_LAT, DEFAULT_LON
+        weather_data = _fetch_weather(DEFAULT_LAT, DEFAULT_LON, target_date.isoformat())
+        if "error" not in weather_data:
+            daily = weather_data["daily"]
+            wmo_code = daily["weathercode"][0]
+            temp_max = daily["temperature_2m_max"][0]
+            condition = _condition_from_wmo(wmo_code, temp_max)
+            mult = WEATHER_MULTIPLIERS.get(condition, 1.0)
+            result["weather_condition"] = condition
+            result["weather_multiplier"] = mult
+            result["revenue"] *= mult
+            if mult != 1.0:
+                result["notes"].append(f"Weather: {condition.replace('_', ' ')} ({mult:.2f}x)")
+    except Exception:
+        pass  # weather unavailable, proceed without it
+
+    # --- Event adjustment (check logged event multipliers) ---
+    try:
+        from tools.events import _learned_multipliers, DEFAULT_EVENT_MULTIPLIERS
+        learned = _learned_multipliers(location_id)
+        # Check prep outcomes for same date's event context
+        outcomes = _load_prep_outcomes(location_id)
+        # Check if there's a logged event for this date or nearby
+        for o in outcomes:
+            if o.get("date") == target_date.isoformat() and o.get("event"):
+                from tools.events import _classify_event
+                etype = _classify_event(o["event"])
+                mult = learned.get(etype, DEFAULT_EVENT_MULTIPLIERS.get(etype, 1.15))
+                result["event_multiplier"] = mult
+                result["revenue"] *= mult
+                result["notes"].append(f"Event: {o['event']} ({mult:.2f}x)")
+                break
+    except Exception:
+        pass
+
+    return result
 
 
 def _round_quarter(n: float) -> float:
@@ -177,14 +267,52 @@ def _fmt_bulk(qty: float) -> str:
 
 
 async def handle_generate_prep_list(arguments: dict) -> str:
-    projected_revenue = float(arguments.get("projected_revenue", 0))
-    buffer_pct = float(arguments.get("buffer_pct", 10.0))
-    date_str = arguments.get("date", "") or "today"
+    projected_revenue = float(arguments.get("projected_revenue", 0) or 0)
+    buffer_pct = arguments.get("buffer_pct")
+    date_str = arguments.get("date", "")
     notes = arguments.get("notes", "")
     location_id = arguments.get("_location_id", "default")
 
+    # Default to tomorrow if no date given
+    if not date_str:
+        target_date = date.today() + timedelta(days=1)
+        date_str = target_date.isoformat()
+    else:
+        try:
+            target_date = date.fromisoformat(date_str)
+        except ValueError:
+            target_date = date.today() + timedelta(days=1)
+
+    forecast_info = []
+
+    # --- Auto-forecast if no revenue given ---
     if not projected_revenue or projected_revenue <= 0:
-        return "projected_revenue is required and must be greater than 0."
+        auto = _auto_forecast_revenue(target_date, location_id)
+        if auto["revenue"] is None or auto["revenue"] <= 0:
+            return (
+                "No projected revenue given and not enough sales history to auto-forecast.\n"
+                "Either provide projected_revenue, or upload sales data first with upload_sales_csv."
+            )
+        projected_revenue = auto["revenue"]
+        forecast_info.append(f"  Auto-forecast:  ${projected_revenue:,.0f}  ({auto['method']})")
+        if auto["weather_condition"]:
+            forecast_info.append(f"  Weather:        {auto['weather_condition'].replace('_', ' ')}  ({auto['weather_multiplier']:.2f}x)")
+        if auto["event_multiplier"] != 1.0:
+            forecast_info.append(f"  Event boost:    {auto['event_multiplier']:.2f}x")
+        for n in auto["notes"]:
+            forecast_info.append(f"  -> {n}")
+
+        # Auto-adjust buffer for bad weather
+        if buffer_pct is None:
+            if auto.get("weather_multiplier", 1.0) < 0.85:
+                buffer_pct = 5.0  # less buffer when it's raining (less traffic)
+            elif auto.get("event_multiplier", 1.0) > 1.10:
+                buffer_pct = 15.0  # more buffer on event days
+            else:
+                buffer_pct = 10.0
+    else:
+        if buffer_pct is None:
+            buffer_pct = 10.0
 
     r = _load_ratios(location_id)
     k = projected_revenue / 1000.0
@@ -252,9 +380,11 @@ async def handle_generate_prep_list(arguments: dict) -> str:
 
     total_food_cost = patty_cost + bacon_cost + hotdog_cost + potato_cost
 
+    day_name = target_date.strftime("%A")
     lines = [
-        f"FIVE GUYS PREP LIST - {date_str}",
+        f"FIVE GUYS PREP LIST - {day_name} {date_str}",
         f"  Projected Revenue:  ${projected_revenue:,.0f}  (+{buffer_pct:.0f}% buffer)",
+        *forecast_info,
         *(["  Notes: " + notes] if notes else []),
         f"",
         f"--- WHAT TO PULL / PREP --------------------------------",
@@ -475,6 +605,7 @@ def _auto_calibrate(outcomes: List[Dict], ratios: Dict, location_id: str) -> Lis
       - Nudge ratio 20% toward observed value (conservative — don't overfit)
       - Cap any single adjustment at +/-10% of current value
       - Track weather/event context: only learn from "normal" days for base ratios
+      - Detect day-of-week patterns (e.g. Saturdays use more bacon)
     """
     adjustments = []
 
@@ -487,6 +618,19 @@ def _auto_calibrate(outcomes: List[Dict], ratios: Dict, location_id: str) -> Lis
     if len(normal_outcomes) < 5:
         return adjustments
 
+    def _nudge_ratio(key: str, observed: float, label: str):
+        """Nudge a ratio 20% toward observed, capped at +/-10%."""
+        current = ratios.get(key, observed)
+        if current == 0:
+            return
+        if abs(observed - current) / current > 0.03:  # >3% off
+            nudge = current + (observed - current) * 0.20
+            nudge = max(current * 0.90, min(current * 1.10, nudge))
+            nudge = round(nudge, 1)
+            if nudge != current:
+                ratios[key] = nudge
+                adjustments.append(f"  {key}: {current} -> {nudge} ({label})")
+
     # --- Beef: compare cases used vs cases predicted ---
     beef_data = [
         o for o in normal_outcomes
@@ -495,17 +639,9 @@ def _auto_calibrate(outcomes: List[Dict], ratios: Dict, location_id: str) -> Lis
     if len(beef_data) >= 5:
         observed_per_1k = [
             (o["beef_cases_used"] * ratios.get("patties_per_case", 120)) / (o["actual_revenue"] / 1000)
-            for o in beef_data[-15:]  # last 15 data points
+            for o in beef_data[-15:]
         ]
-        avg_observed = statistics.mean(observed_per_1k)
-        current = ratios.get("patties_per_1k", 180)
-        if abs(avg_observed - current) / current > 0.03:  # >3% off
-            nudge = current + (avg_observed - current) * 0.20  # 20% toward observed
-            nudge = max(current * 0.90, min(current * 1.10, nudge))  # cap at +/-10%
-            nudge = round(nudge, 1)
-            if nudge != current:
-                ratios["patties_per_1k"] = nudge
-                adjustments.append(f"  patties_per_1k: {current} -> {nudge} (beef usage pattern)")
+        _nudge_ratio("patties_per_1k", statistics.mean(observed_per_1k), "beef usage pattern")
 
     # --- Bacon: compare sheets used ---
     bacon_data = [
@@ -513,15 +649,11 @@ def _auto_calibrate(outcomes: List[Dict], ratios: Dict, location_id: str) -> Lis
         if o.get("bacon_sheets_used") is not None and o.get("actual_revenue", 0) > 0
     ]
     if len(bacon_data) >= 5:
-        strips_per_sheet = ratios.get("bacon_strips_per_sheet", 20)
-        # Derive effective bacon_strips per $1k from sheets used
-        # We can't directly map to a single ratio since bacon comes from multiple sources
-        # Instead, check if we consistently over/under prep bacon
-        # Use the ran_out_of field as a strong signal
+        # Use ran_out_of as strong signal for under-prepping
         ran_out_bacon = sum(1 for o in bacon_data[-15:] if "bacon" in (o.get("ran_out_of") or "").lower())
-        if ran_out_bacon >= 2:  # ran out 2+ times in last 15 days
+        if ran_out_bacon >= 2:
             old = ratios.get("bacon_burger_pct", 0.50)
-            new = min(old * 1.05, 0.80)  # bump by 5%, cap at 80%
+            new = min(old * 1.05, 0.80)
             ratios["bacon_burger_pct"] = round(new, 3)
             adjustments.append(f"  bacon_burger_pct: {old} -> {new:.3f} (ran out {ran_out_bacon}x recently)")
 
@@ -536,15 +668,7 @@ def _auto_calibrate(outcomes: List[Dict], ratios: Dict, location_id: str) -> Lis
             (o["cheese_sleeves_used"] * slices_per_sleeve) / (o["actual_revenue"] / 1000)
             for o in cheese_data[-15:]
         ]
-        avg_observed = statistics.mean(observed_per_1k)
-        current = ratios.get("cheese_slices_per_1k", 82)
-        if abs(avg_observed - current) / current > 0.03:
-            nudge = current + (avg_observed - current) * 0.20
-            nudge = max(current * 0.90, min(current * 1.10, nudge))
-            nudge = round(nudge, 1)
-            if nudge != current:
-                ratios["cheese_slices_per_1k"] = nudge
-                adjustments.append(f"  cheese_slices_per_1k: {current} -> {nudge} (cheese usage pattern)")
+        _nudge_ratio("cheese_slices_per_1k", statistics.mean(observed_per_1k), "cheese usage pattern")
 
     # --- Potatoes: compare bags used ---
     potato_data = [
@@ -554,23 +678,38 @@ def _auto_calibrate(outcomes: List[Dict], ratios: Dict, location_id: str) -> Lis
     if len(potato_data) >= 5:
         lbs_per_bag = ratios.get("potato_lbs_per_bag", 50)
         lbs_per_portion = ratios.get("potato_lbs_per_portion", 0.90)
-        observed_portions_per_1k = [
+        observed_per_1k = [
             (o["potato_bags_used"] * lbs_per_bag / lbs_per_portion) / (o["actual_revenue"] / 1000)
             for o in potato_data[-15:]
         ]
-        avg_observed = statistics.mean(observed_portions_per_1k)
-        current = ratios.get("fry_portions_per_1k", 52)
-        if abs(avg_observed - current) / current > 0.03:
-            nudge = current + (avg_observed - current) * 0.20
-            nudge = max(current * 0.90, min(current * 1.10, nudge))
-            nudge = round(nudge, 1)
-            if nudge != current:
-                ratios["fry_portions_per_1k"] = nudge
-                adjustments.append(f"  fry_portions_per_1k: {current} -> {nudge} (potato usage pattern)")
+        _nudge_ratio("fry_portions_per_1k", statistics.mean(observed_per_1k), "potato usage pattern")
+
+    # --- Day-of-week pattern detection ---
+    # If certain days consistently use more/less of an item, flag it
+    dow_beef: Dict[str, List[float]] = {}
+    for o in normal_outcomes:
+        if o.get("beef_cases_used") is not None and o.get("actual_revenue", 0) > 0:
+            try:
+                d = date.fromisoformat(o["date"])
+                dow = d.strftime("%A")
+                per_1k = (o["beef_cases_used"] * ratios.get("patties_per_case", 120)) / (o["actual_revenue"] / 1000)
+                dow_beef.setdefault(dow, []).append(per_1k)
+            except (ValueError, KeyError):
+                continue
+
+    if dow_beef:
+        overall_avg = statistics.mean([v for vals in dow_beef.values() for v in vals])
+        for dow, vals in dow_beef.items():
+            if len(vals) >= 3:
+                dow_avg = statistics.mean(vals)
+                diff_pct = (dow_avg - overall_avg) / overall_avg * 100
+                if abs(diff_pct) > 8:
+                    direction = "more" if diff_pct > 0 else "less"
+                    adjustments.append(f"  PATTERN: {dow}s use {abs(diff_pct):.0f}% {direction} beef than average")
 
     # --- Ran-out-of signals (any item) ---
     recent = normal_outcomes[-15:]
-    for item in ("beef", "cheese", "potato", "potatoes", "fries"):
+    for item in ("beef", "bacon", "cheese", "potato", "potatoes", "fries"):
         ran_out_count = sum(1 for o in recent if item in (o.get("ran_out_of") or "").lower())
         if ran_out_count >= 3:
             adjustments.append(f"  WARNING: Ran out of {item} {ran_out_count}x in last 15 days. Consider increasing buffer_pct.")
