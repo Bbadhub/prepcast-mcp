@@ -16,20 +16,23 @@ Five Guys key facts:
 
 Handlers:
     generate_prep_list   - full Five Guys prep list for a projected revenue
-    update_menu_ratios   - manager calibrates ratios from actual outcomes
+    log_prep_outcome     - crew logs actual usage at end of day; auto-calibrates ratios
+    update_menu_ratios   - manager manually overrides a ratio
     get_menu_ratios      - inspect current ratio config
 """
 
-from typing import Any, Dict
-from datetime import date
+from typing import Any, Dict, List
+from datetime import date, datetime
+import statistics
 
 # ---------------------------------------------------------------------------
 # Storage
 # ---------------------------------------------------------------------------
 
-from store import load_json_dict, save_json
+from store import load_json, load_json_dict, save_json
 
 RATIOS_FILE = "menu_ratios.json"
+PREP_OUTCOMES_FILE = "prep_outcomes.json"
 
 # ---------------------------------------------------------------------------
 # Five Guys Default Ratios - units per $1,000 revenue
@@ -391,13 +394,463 @@ async def handle_get_menu_ratios(arguments: dict) -> str:
 
 
 # ===========================================================================
+# Tool: log_prep_outcome  (end-of-day feedback loop)
+# ===========================================================================
+
+LOG_PREP_OUTCOME_TOOL = {
+    "name": "log_prep_outcome",
+    "description": (
+        "Log what the crew actually used at end of day. The system compares this "
+        "to what was prepped and auto-adjusts ratios over time so prep lists get "
+        "more accurate. Uses the same bulk units: cases of beef, sheets of bacon, "
+        "sleeves of cheese, bags of potatoes. Also records weather and events for "
+        "that day so the system learns different patterns for different conditions."
+    ),
+    "inputSchema": {
+        "type": "object",
+        "properties": {
+            "date": {
+                "type": "string",
+                "description": "Date this outcome is for (YYYY-MM-DD).",
+            },
+            "actual_revenue": {
+                "type": "number",
+                "description": "Actual revenue for the day.",
+            },
+            "beef_cases_used": {
+                "type": "number",
+                "description": "How many cases of beef were actually used (e.g. 9.5).",
+            },
+            "bacon_sheets_used": {
+                "type": "number",
+                "description": "How many sheets of bacon were actually used.",
+            },
+            "cheese_sleeves_used": {
+                "type": "number",
+                "description": "How many sleeves of cheese were actually used.",
+            },
+            "potato_bags_used": {
+                "type": "number",
+                "description": "How many bags of potatoes were actually used.",
+            },
+            "ran_out_of": {
+                "type": "string",
+                "description": "Comma-separated items that ran out (e.g. 'bacon,cheese'). Leave blank if nothing ran out.",
+            },
+            "weather": {
+                "type": "string",
+                "description": "Weather that day (e.g. 'rain', 'clear', 'hot'). Optional - system can auto-fetch.",
+            },
+            "event": {
+                "type": "string",
+                "description": "Event nearby that day (e.g. 'volleyball tournament'). Blank if none.",
+            },
+            "notes": {
+                "type": "string",
+                "description": "Any notes (e.g. 'short staffed', 'late truck delivery').",
+            },
+        },
+        "required": ["date", "actual_revenue"],
+    },
+}
+
+
+def _load_prep_outcomes(location_id: str = "default") -> List[Dict]:
+    return load_json(location_id, PREP_OUTCOMES_FILE)
+
+
+def _save_prep_outcomes(outcomes: List[Dict], location_id: str = "default"):
+    save_json(location_id, PREP_OUTCOMES_FILE, outcomes)
+
+
+def _auto_calibrate(outcomes: List[Dict], ratios: Dict, location_id: str) -> List[str]:
+    """
+    Compare prep outcomes to what the ratios would have predicted.
+    If there's a consistent bias over 5+ data points, nudge the ratio.
+    Returns a list of adjustment messages.
+
+    Learning rules:
+      - Only adjust if 5+ outcomes logged (need pattern, not noise)
+      - Compare actual usage per $1k revenue vs current ratio prediction
+      - Nudge ratio 20% toward observed value (conservative — don't overfit)
+      - Cap any single adjustment at +/-10% of current value
+      - Track weather/event context: only learn from "normal" days for base ratios
+    """
+    adjustments = []
+
+    # Filter to normal days (no events, no extreme weather) for base ratio learning
+    normal_outcomes = [
+        o for o in outcomes
+        if not o.get("event") and o.get("weather", "clear") not in ("rain", "heavy_rain", "thunderstorm", "snow", "blizzard")
+    ]
+
+    if len(normal_outcomes) < 5:
+        return adjustments
+
+    # --- Beef: compare cases used vs cases predicted ---
+    beef_data = [
+        o for o in normal_outcomes
+        if o.get("beef_cases_used") is not None and o.get("actual_revenue", 0) > 0
+    ]
+    if len(beef_data) >= 5:
+        observed_per_1k = [
+            (o["beef_cases_used"] * ratios.get("patties_per_case", 120)) / (o["actual_revenue"] / 1000)
+            for o in beef_data[-15:]  # last 15 data points
+        ]
+        avg_observed = statistics.mean(observed_per_1k)
+        current = ratios.get("patties_per_1k", 180)
+        if abs(avg_observed - current) / current > 0.03:  # >3% off
+            nudge = current + (avg_observed - current) * 0.20  # 20% toward observed
+            nudge = max(current * 0.90, min(current * 1.10, nudge))  # cap at +/-10%
+            nudge = round(nudge, 1)
+            if nudge != current:
+                ratios["patties_per_1k"] = nudge
+                adjustments.append(f"  patties_per_1k: {current} -> {nudge} (beef usage pattern)")
+
+    # --- Bacon: compare sheets used ---
+    bacon_data = [
+        o for o in normal_outcomes
+        if o.get("bacon_sheets_used") is not None and o.get("actual_revenue", 0) > 0
+    ]
+    if len(bacon_data) >= 5:
+        strips_per_sheet = ratios.get("bacon_strips_per_sheet", 20)
+        # Derive effective bacon_strips per $1k from sheets used
+        # We can't directly map to a single ratio since bacon comes from multiple sources
+        # Instead, check if we consistently over/under prep bacon
+        # Use the ran_out_of field as a strong signal
+        ran_out_bacon = sum(1 for o in bacon_data[-15:] if "bacon" in (o.get("ran_out_of") or "").lower())
+        if ran_out_bacon >= 2:  # ran out 2+ times in last 15 days
+            old = ratios.get("bacon_burger_pct", 0.50)
+            new = min(old * 1.05, 0.80)  # bump by 5%, cap at 80%
+            ratios["bacon_burger_pct"] = round(new, 3)
+            adjustments.append(f"  bacon_burger_pct: {old} -> {new:.3f} (ran out {ran_out_bacon}x recently)")
+
+    # --- Cheese: compare sleeves used ---
+    cheese_data = [
+        o for o in normal_outcomes
+        if o.get("cheese_sleeves_used") is not None and o.get("actual_revenue", 0) > 0
+    ]
+    if len(cheese_data) >= 5:
+        slices_per_sleeve = ratios.get("cheese_slices_per_sleeve", 72)
+        observed_per_1k = [
+            (o["cheese_sleeves_used"] * slices_per_sleeve) / (o["actual_revenue"] / 1000)
+            for o in cheese_data[-15:]
+        ]
+        avg_observed = statistics.mean(observed_per_1k)
+        current = ratios.get("cheese_slices_per_1k", 82)
+        if abs(avg_observed - current) / current > 0.03:
+            nudge = current + (avg_observed - current) * 0.20
+            nudge = max(current * 0.90, min(current * 1.10, nudge))
+            nudge = round(nudge, 1)
+            if nudge != current:
+                ratios["cheese_slices_per_1k"] = nudge
+                adjustments.append(f"  cheese_slices_per_1k: {current} -> {nudge} (cheese usage pattern)")
+
+    # --- Potatoes: compare bags used ---
+    potato_data = [
+        o for o in normal_outcomes
+        if o.get("potato_bags_used") is not None and o.get("actual_revenue", 0) > 0
+    ]
+    if len(potato_data) >= 5:
+        lbs_per_bag = ratios.get("potato_lbs_per_bag", 50)
+        lbs_per_portion = ratios.get("potato_lbs_per_portion", 0.90)
+        observed_portions_per_1k = [
+            (o["potato_bags_used"] * lbs_per_bag / lbs_per_portion) / (o["actual_revenue"] / 1000)
+            for o in potato_data[-15:]
+        ]
+        avg_observed = statistics.mean(observed_portions_per_1k)
+        current = ratios.get("fry_portions_per_1k", 52)
+        if abs(avg_observed - current) / current > 0.03:
+            nudge = current + (avg_observed - current) * 0.20
+            nudge = max(current * 0.90, min(current * 1.10, nudge))
+            nudge = round(nudge, 1)
+            if nudge != current:
+                ratios["fry_portions_per_1k"] = nudge
+                adjustments.append(f"  fry_portions_per_1k: {current} -> {nudge} (potato usage pattern)")
+
+    # --- Ran-out-of signals (any item) ---
+    recent = normal_outcomes[-15:]
+    for item in ("beef", "cheese", "potato", "potatoes", "fries"):
+        ran_out_count = sum(1 for o in recent if item in (o.get("ran_out_of") or "").lower())
+        if ran_out_count >= 3:
+            adjustments.append(f"  WARNING: Ran out of {item} {ran_out_count}x in last 15 days. Consider increasing buffer_pct.")
+
+    if adjustments:
+        _save_ratios(ratios, location_id)
+
+    return adjustments
+
+
+async def handle_log_prep_outcome(arguments: dict) -> str:
+    date_str = arguments.get("date", "")
+    actual_revenue = float(arguments.get("actual_revenue", 0))
+    location_id = arguments.get("_location_id", "default")
+
+    if not date_str or not actual_revenue:
+        return "date and actual_revenue are required."
+
+    outcome = {
+        "date": date_str,
+        "actual_revenue": actual_revenue,
+        "logged_at": datetime.utcnow().isoformat(),
+    }
+
+    # Bulk usage fields (all optional)
+    for field in ("beef_cases_used", "bacon_sheets_used", "cheese_sleeves_used", "potato_bags_used"):
+        val = arguments.get(field)
+        if val is not None:
+            outcome[field] = float(val)
+
+    # Context fields
+    for field in ("ran_out_of", "weather", "event", "notes"):
+        val = arguments.get(field)
+        if val:
+            outcome[field] = val
+
+    # Save outcome
+    outcomes = _load_prep_outcomes(location_id)
+    # Replace if same date exists
+    outcomes = [o for o in outcomes if o.get("date") != date_str]
+    outcomes.append(outcome)
+    outcomes.sort(key=lambda o: o.get("date", ""))
+    _save_prep_outcomes(outcomes, location_id)
+
+    # Run auto-calibration
+    ratios = _load_ratios(location_id)
+    adjustments = _auto_calibrate(outcomes, ratios, location_id)
+
+    lines = [
+        f"Logged prep outcome for {date_str}",
+        f"  Revenue: ${actual_revenue:,.0f}",
+    ]
+    if outcome.get("beef_cases_used") is not None:
+        lines.append(f"  Beef used: {_fmt_bulk(outcome['beef_cases_used'])} cases")
+    if outcome.get("bacon_sheets_used") is not None:
+        lines.append(f"  Bacon used: {_fmt_bulk(outcome['bacon_sheets_used'])} sheets")
+    if outcome.get("cheese_sleeves_used") is not None:
+        lines.append(f"  Cheese used: {_fmt_bulk(outcome['cheese_sleeves_used'])} sleeves")
+    if outcome.get("potato_bags_used") is not None:
+        lines.append(f"  Potatoes used: {_fmt_bulk(outcome['potato_bags_used'])} bags")
+    if outcome.get("ran_out_of"):
+        lines.append(f"  Ran out of: {outcome['ran_out_of']}")
+    if outcome.get("weather"):
+        lines.append(f"  Weather: {outcome['weather']}")
+    if outcome.get("event"):
+        lines.append(f"  Event: {outcome['event']}")
+
+    lines.append(f"")
+    lines.append(f"Total logged days: {len(outcomes)}")
+
+    if adjustments:
+        lines.append(f"")
+        lines.append(f"AUTO-CALIBRATION (ratios adjusted):")
+        lines.extend(adjustments)
+    elif len(outcomes) < 5:
+        lines.append(f"Auto-calibration activates after 5 logged days ({5 - len(outcomes)} more needed).")
+    else:
+        lines.append(f"Ratios look accurate - no adjustments needed.")
+
+    return "\n".join(lines)
+
+
+# ===========================================================================
+# Tool: get_prep_dashboard  (in-chat visual artifact data)
+# ===========================================================================
+
+GET_PREP_DASHBOARD_TOOL = {
+    "name": "get_prep_dashboard",
+    "description": (
+        "Get prep efficiency data for in-chat visual display. Returns structured data "
+        "showing: prep accuracy trends over time, food cost tracking, what items run "
+        "out most, auto-calibration history, and weather/event impact on prep needs. "
+        "Use this to show the operator visual charts and tables right in the conversation."
+    ),
+    "inputSchema": {
+        "type": "object",
+        "properties": {
+            "days": {
+                "type": "integer",
+                "description": "How many days of history to include (default: 30).",
+            },
+        },
+        "required": [],
+    },
+}
+
+
+async def handle_get_prep_dashboard(arguments: dict) -> str:
+    location_id = arguments.get("_location_id", "default")
+    days = int(arguments.get("days", 30))
+    outcomes = _load_prep_outcomes(location_id)
+    ratios = _load_ratios(location_id)
+
+    if not outcomes:
+        return (
+            "NO PREP DATA YET\n\n"
+            "Start logging end-of-day usage with log_prep_outcome to build your dashboard.\n"
+            "After 5+ days, the system auto-calibrates your ratios from actual patterns.\n\n"
+            "Example: log_prep_outcome with date, actual_revenue, beef_cases_used, "
+            "bacon_sheets_used, cheese_sleeves_used, potato_bags_used"
+        )
+
+    cutoff = date.today() - __import__("datetime").timedelta(days=days)
+    recent = [o for o in outcomes if o.get("date", "") >= cutoff.isoformat()]
+    if not recent:
+        recent = outcomes[-30:]  # fallback to last 30 entries
+
+    # --- Prep accuracy by item (predicted vs used) ---
+    accuracy_data = []
+    for o in recent:
+        rev = o.get("actual_revenue", 0)
+        if not rev:
+            continue
+        k = rev / 1000.0
+        buf = 1.10  # default buffer
+        row = {"date": o["date"], "revenue": rev}
+
+        if o.get("beef_cases_used") is not None:
+            predicted = _round_quarter(k * ratios["patties_per_1k"] * buf / ratios["patties_per_case"])
+            row["beef_predicted"] = predicted
+            row["beef_used"] = o["beef_cases_used"]
+            row["beef_diff"] = round(predicted - o["beef_cases_used"], 2)
+
+        if o.get("bacon_sheets_used") is not None:
+            # Approximate bacon prediction
+            patties_raw = k * ratios["patties_per_1k"]
+            burger_orders = patties_raw / ratios.get("patties_per_order_blended", 1.7)
+            bacon_strips = (burger_orders * ratios["bacon_burger_pct"] * ratios["bacon_strips_per_burger"]) * buf
+            predicted = _round_quarter(bacon_strips / ratios.get("bacon_strips_per_sheet", 20))
+            row["bacon_predicted"] = predicted
+            row["bacon_used"] = o["bacon_sheets_used"]
+            row["bacon_diff"] = round(predicted - o["bacon_sheets_used"], 2)
+
+        if o.get("cheese_sleeves_used") is not None:
+            predicted = _round_quarter(k * ratios["cheese_slices_per_1k"] * buf / ratios.get("cheese_slices_per_sleeve", 72))
+            row["cheese_predicted"] = predicted
+            row["cheese_used"] = o["cheese_sleeves_used"]
+            row["cheese_diff"] = round(predicted - o["cheese_sleeves_used"], 2)
+
+        if o.get("potato_bags_used") is not None:
+            fry_portions = k * ratios["fry_portions_per_1k"] * buf
+            predicted = _round_quarter(fry_portions * ratios["potato_lbs_per_portion"] / ratios["potato_lbs_per_bag"])
+            row["potato_predicted"] = predicted
+            row["potato_used"] = o["potato_bags_used"]
+            row["potato_diff"] = round(predicted - o["potato_bags_used"], 2)
+
+        if o.get("weather"):
+            row["weather"] = o["weather"]
+        if o.get("event"):
+            row["event"] = o["event"]
+        if o.get("ran_out_of"):
+            row["ran_out_of"] = o["ran_out_of"]
+
+        accuracy_data.append(row)
+
+    # --- Summary stats ---
+    beef_diffs = [r["beef_diff"] for r in accuracy_data if "beef_diff" in r]
+    bacon_diffs = [r["bacon_diff"] for r in accuracy_data if "bacon_diff" in r]
+    cheese_diffs = [r["cheese_diff"] for r in accuracy_data if "cheese_diff" in r]
+    potato_diffs = [r["potato_diff"] for r in accuracy_data if "potato_diff" in r]
+
+    def _avg(lst):
+        return round(statistics.mean(lst), 2) if lst else None
+
+    # --- Ran-out-of frequency ---
+    ran_out_counts = {}
+    for o in recent:
+        items = (o.get("ran_out_of") or "").lower().split(",")
+        for item in items:
+            item = item.strip()
+            if item:
+                ran_out_counts[item] = ran_out_counts.get(item, 0) + 1
+
+    # --- Food cost trend ---
+    cost_trend = []
+    for o in recent:
+        rev = o.get("actual_revenue", 0)
+        if not rev:
+            continue
+        beef_cost = (o.get("beef_cases_used") or 0) * ratios.get("patty_case_cost", 500)
+        bacon_cost = ((o.get("bacon_sheets_used") or 0) * ratios.get("bacon_strips_per_sheet", 20) / ratios.get("bacon_strips_per_case", 240)) * ratios.get("bacon_case_cost", 55)
+        potato_cost = (o.get("potato_bags_used") or 0) * ratios.get("potato_bag_cost", 22)
+        total_cost = beef_cost + bacon_cost + potato_cost
+        cost_pct = (total_cost / rev * 100) if rev else 0
+        cost_trend.append({
+            "date": o["date"],
+            "revenue": rev,
+            "food_cost": round(total_cost, 0),
+            "food_cost_pct": round(cost_pct, 1),
+        })
+
+    # --- Build output ---
+    lines = [
+        f"PREP EFFICIENCY DASHBOARD",
+        f"  Period: last {days} days  |  {len(recent)} days logged",
+        f"",
+    ]
+
+    # Accuracy summary
+    lines.append("PREP ACCURACY (predicted - used, positive = over-prep)")
+    if beef_diffs:
+        lines.append(f"  Beef:     avg {_avg(beef_diffs):+.2f} cases/day  (over {len(beef_diffs)} days)")
+    if bacon_diffs:
+        lines.append(f"  Bacon:    avg {_avg(bacon_diffs):+.2f} sheets/day")
+    if cheese_diffs:
+        lines.append(f"  Cheese:   avg {_avg(cheese_diffs):+.2f} sleeves/day")
+    if potato_diffs:
+        lines.append(f"  Potatoes: avg {_avg(potato_diffs):+.2f} bags/day")
+    if not any([beef_diffs, bacon_diffs, cheese_diffs, potato_diffs]):
+        lines.append("  No item-level data yet. Log beef_cases_used, bacon_sheets_used, etc.")
+    lines.append("")
+
+    # Ran out of
+    if ran_out_counts:
+        lines.append("RAN OUT OF (frequency)")
+        for item, count in sorted(ran_out_counts.items(), key=lambda x: -x[1]):
+            lines.append(f"  {item:<20} {count}x")
+        lines.append("")
+
+    # Food cost trend
+    if cost_trend:
+        lines.append("FOOD COST TREND")
+        for ct in cost_trend[-10:]:
+            bar = "#" * int(ct["food_cost_pct"] / 2)
+            target_marker = " <-- target" if 28 <= ct["food_cost_pct"] <= 32 else ""
+            lines.append(f"  {ct['date']}  ${ct['revenue']:>6,.0f}  cost ${ct['food_cost']:>5,.0f}  {ct['food_cost_pct']:>4.1f}% {bar}{target_marker}")
+        lines.append(f"  Target range: 28-32%")
+        lines.append("")
+
+    # Daily detail table
+    lines.append("DAILY DETAIL")
+    lines.append(f"  {'Date':<12} {'Rev':>7} {'Beef':>6} {'Bacon':>6} {'Cheese':>6} {'Potato':>6} {'Weather':>8} {'Event'}")
+    lines.append(f"  {'-'*12} {'-'*7} {'-'*6} {'-'*6} {'-'*6} {'-'*6} {'-'*8} {'-'*15}")
+    for r in accuracy_data[-15:]:
+        beef = f"{r.get('beef_used', '-'):>6}" if isinstance(r.get('beef_used'), (int, float)) else "     -"
+        bacon = f"{r.get('bacon_used', '-'):>6}" if isinstance(r.get('bacon_used'), (int, float)) else "     -"
+        cheese = f"{r.get('cheese_used', '-'):>6}" if isinstance(r.get('cheese_used'), (int, float)) else "     -"
+        potato = f"{r.get('potato_used', '-'):>6}" if isinstance(r.get('potato_used'), (int, float)) else "     -"
+        weather = r.get("weather", "-")[:8]
+        event = r.get("event", "-")[:15]
+        ran_out = f" !! {r['ran_out_of']}" if r.get("ran_out_of") else ""
+        lines.append(f"  {r['date']:<12} ${r['revenue']:>6,.0f} {beef} {bacon} {cheese} {potato} {weather:>8} {event}{ran_out}")
+
+    lines.append("")
+    lines.append(f"Auto-calibration: {'ACTIVE' if len(outcomes) >= 5 else f'{5 - len(outcomes)} more days needed'}")
+    lines.append("Log end-of-day usage with log_prep_outcome to improve accuracy.")
+
+    return "\n".join(lines)
+
+
+# ===========================================================================
 # Exports
 # ===========================================================================
 
-TOOLS = [GENERATE_PREP_LIST_TOOL, UPDATE_RATIOS_TOOL, GET_RATIOS_TOOL]
+TOOLS = [GENERATE_PREP_LIST_TOOL, LOG_PREP_OUTCOME_TOOL, GET_PREP_DASHBOARD_TOOL, UPDATE_RATIOS_TOOL, GET_RATIOS_TOOL]
 
 HANDLERS = {
     "generate_prep_list": handle_generate_prep_list,
+    "log_prep_outcome": handle_log_prep_outcome,
+    "get_prep_dashboard": handle_get_prep_dashboard,
     "update_menu_ratios": handle_update_menu_ratios,
     "get_menu_ratios": handle_get_menu_ratios,
 }
