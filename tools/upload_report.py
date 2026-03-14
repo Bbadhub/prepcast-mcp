@@ -21,6 +21,7 @@ Data validation:
 
 import base64
 import csv
+import hashlib
 import io
 import json
 import re
@@ -28,9 +29,10 @@ import statistics
 from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
-from store import load_json, save_json
+from store import load_json, load_json_dict, save_json
 
 SALES_FILE = "sales_history.json"
+STAGED_IMPORT_FILE = "staged_import.json"
 
 # Revenue sanity bounds (Five Guys single store)
 MIN_REVENUE = 100       # below this is probably a parsing error
@@ -476,6 +478,106 @@ UPLOAD_SALES_TOOL = {
 }
 
 
+def _stage_import(records: List[Dict], warnings: List[str], parse_errors: List[str],
+                   fmt: str, location_id: str) -> str:
+    """Stage parsed records for AI review. Returns a unique import_id."""
+    import_id = hashlib.md5(
+        json.dumps(records[:3], sort_keys=True).encode() + location_id.encode()
+    ).hexdigest()[:10]
+
+    staged = {
+        "import_id": import_id,
+        "format": fmt,
+        "records": records,
+        "warnings": warnings,
+        "parse_errors": parse_errors,
+        "record_count": len(records),
+    }
+    save_json(location_id, STAGED_IMPORT_FILE, staged)
+    return import_id
+
+
+def _build_ai_review_preview(records: List[Dict], warnings: List[str],
+                              parse_errors: List[str], fmt: str,
+                              import_id: str) -> str:
+    """Build a preview string for the AI to review before confirming import."""
+    revenues = [r["revenue"] for r in records]
+    avg_rev = statistics.mean(revenues) if revenues else 0
+
+    lines = [
+        f"PARSED {len(records)} records from {fmt.upper()} — REVIEW BEFORE IMPORTING",
+        f"Import ID: {import_id}",
+        "",
+        f"--- SUMMARY ---",
+        f"  Date range:    {records[0]['date']} -> {records[-1]['date']}",
+        f"  Avg revenue:   ${avg_rev:,.0f}/day",
+        f"  Min:           ${min(revenues):,.0f}",
+        f"  Max:           ${max(revenues):,.0f}",
+        "",
+        f"--- SAMPLE DATA (first 10 rows) ---",
+    ]
+
+    for r in records[:10]:
+        d = r["date"]
+        rev = r["revenue"]
+        flag = ""
+        if rev < MIN_REVENUE:
+            flag = "  ⚠ LOW"
+        elif rev > MAX_REVENUE:
+            flag = "  ⚠ HIGH"
+        lines.append(f"  {d}   ${rev:>10,.2f}{flag}")
+
+    if len(records) > 10:
+        lines.append(f"  ... and {len(records) - 10} more rows")
+
+    # Show day-of-week distribution so AI can spot patterns / anomalies
+    dow_counts: Dict[str, List[float]] = {}
+    for r in records:
+        try:
+            d = date.fromisoformat(r["date"])
+            day_name = d.strftime("%A")
+            dow_counts.setdefault(day_name, []).append(r["revenue"])
+        except ValueError:
+            pass
+    if dow_counts:
+        lines.append("")
+        lines.append("--- DAY-OF-WEEK AVERAGES ---")
+        for day in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]:
+            if day in dow_counts:
+                vals = dow_counts[day]
+                lines.append(f"  {day:<10} ${statistics.mean(vals):>9,.0f}  ({len(vals)} days)")
+
+    if parse_errors:
+        lines.append("")
+        lines.append(f"--- PARSE ISSUES ({len(parse_errors)}) ---")
+        for e in parse_errors[:8]:
+            lines.append(f"  {e}")
+        if len(parse_errors) > 8:
+            lines.append(f"  ... and {len(parse_errors) - 8} more")
+
+    if warnings:
+        lines.append("")
+        lines.append(f"--- VALIDATION FLAGS ({len(warnings)}) ---")
+        for w in warnings[:8]:
+            lines.append(f"  {w}")
+        if len(warnings) > 8:
+            lines.append(f"  ... and {len(warnings) - 8} more")
+
+    lines.append("")
+    lines.append("--- AI VALIDATION CHECKLIST ---")
+    lines.append("Please check:")
+    lines.append("  1. Do the dates look correct? (no year/month swaps)")
+    lines.append("  2. Are revenue figures reasonable for a Five Guys? ($2k-$15k typical)")
+    lines.append("  3. Any suspicious outliers or duplicates?")
+    lines.append("  4. Do day-of-week patterns make sense? (weekends usually higher)")
+    lines.append("  5. Any parse errors that need attention?")
+    lines.append("")
+    lines.append(f"If data looks good → run confirm_sales_import")
+    lines.append(f"If issues found → describe them and I'll help fix before importing")
+
+    return "\n".join(lines)
+
+
 async def handle_upload_sales_data(arguments: dict) -> str:
     csv_text = arguments.get("csv_text", "")
     file_b64 = arguments.get("file_base64", "")
@@ -520,48 +622,110 @@ async def handle_upload_sales_data(arguments: dict) -> str:
             "All records failed validation:\n" + "\n".join(validation_warnings[:10])
         )
 
-    # Save
+    # Stage for AI review (don't save to sales history yet)
+    import_id = _stage_import(clean_records, validation_warnings, parse_errors,
+                               fmt, location_id)
+
+    return _build_ai_review_preview(clean_records, validation_warnings,
+                                     parse_errors, fmt, import_id)
+
+
+# ===========================================================================
+# MCP Tool: confirm_sales_import (step 2 — commit staged data)
+# ===========================================================================
+
+CONFIRM_IMPORT_TOOL = {
+    "name": "confirm_sales_import",
+    "description": (
+        "Confirm and save staged sales data after AI validation. "
+        "Run this after reviewing upload_sales_data output. "
+        "Optionally exclude specific dates or apply corrections."
+    ),
+    "inputSchema": {
+        "type": "object",
+        "properties": {
+            "exclude_dates": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Dates to exclude from import (YYYY-MM-DD). Use if AI flagged bad rows.",
+            },
+            "corrections": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "date": {"type": "string"},
+                        "revenue": {"type": "number"},
+                    },
+                },
+                "description": "Override revenue for specific dates. E.g. [{'date':'2025-01-15','revenue':6200}]",
+            },
+        },
+        "required": [],
+    },
+}
+
+
+async def handle_confirm_sales_import(arguments: dict) -> str:
+    location_id = arguments.get("_location_id", "default")
+    exclude_dates = set(arguments.get("exclude_dates", []))
+    corrections = {c["date"]: c["revenue"] for c in arguments.get("corrections", []) if "date" in c and "revenue" in c}
+
+    # Load staged data
+    staged = load_json_dict(location_id, STAGED_IMPORT_FILE)
+    if not staged or "records" not in staged:
+        return "No staged import found. Run upload_sales_data first to parse and review data."
+
+    records = staged["records"]
+    fmt = staged.get("format", "unknown")
+
+    # Apply exclusions
+    if exclude_dates:
+        before = len(records)
+        records = [r for r in records if r["date"] not in exclude_dates]
+        excluded = before - len(records)
+    else:
+        excluded = 0
+
+    # Apply corrections
+    corrected = 0
+    for r in records:
+        if r["date"] in corrections:
+            r["revenue"] = corrections[r["date"]]
+            corrected += 1
+
+    if not records:
+        return "No records left after exclusions. Nothing imported."
+
+    # Save to sales history
     existing = _load_sales(location_id)
-    combined = existing + clean_records
+    combined = existing + records
     _save_sales(combined, location_id)
     final = _load_sales(location_id)
 
-    # Summary stats
-    revenues = [r["revenue"] for r in clean_records]
+    # Clear staged data
+    save_json(location_id, STAGED_IMPORT_FILE, {})
+
+    # Summary
+    revenues = [r["revenue"] for r in records]
     avg_rev = statistics.mean(revenues) if revenues else 0
 
     lines = [
-        f"IMPORTED {len(clean_records)} records from {fmt.upper()}",
-        f"  Date range:    {clean_records[0]['date']} -> {clean_records[-1]['date']}",
+        f"IMPORTED {len(records)} records from {fmt.upper()}",
+        f"  Date range:    {records[0]['date']} -> {records[-1]['date']}",
         f"  Avg revenue:   ${avg_rev:,.0f}/day",
         f"  Min:           ${min(revenues):,.0f}",
         f"  Max:           ${max(revenues):,.0f}",
         f"  Total history: {len(final)} days",
     ]
 
-    if parse_errors:
-        lines.append(f"")
-        lines.append(f"PARSE ISSUES ({len(parse_errors)}):")
-        for e in parse_errors[:5]:
-            lines.append(f"  {e}")
-        if len(parse_errors) > 5:
-            lines.append(f"  ... and {len(parse_errors) - 5} more")
+    if excluded:
+        lines.append(f"  Excluded:      {excluded} dates (AI flagged)")
+    if corrected:
+        lines.append(f"  Corrected:     {corrected} dates (AI fixed)")
 
-    if validation_warnings:
-        lines.append(f"")
-        lines.append(f"VALIDATION ({len(validation_warnings)}):")
-        for w in validation_warnings[:5]:
-            lines.append(w)
-        if len(validation_warnings) > 5:
-            lines.append(f"  ... and {len(validation_warnings) - 5} more")
-
-    skipped = len(records) - len(clean_records)
-    if skipped:
-        lines.append(f"")
-        lines.append(f"  {skipped} records skipped (future dates or invalid)")
-
-    lines.append(f"")
-    lines.append(f"Run analyze_history to see patterns, or forecast_sales to project revenue.")
+    lines.append("")
+    lines.append("Run analyze_history to see patterns, or forecast_sales to project revenue.")
 
     return "\n".join(lines)
 
@@ -702,10 +866,11 @@ async def handle_get_sales_summary(arguments: dict) -> str:
 # Exports
 # ===========================================================================
 
-TOOLS = [UPLOAD_SALES_TOOL, UPLOAD_SALES_CSV_TOOL, LOG_DAILY_SALES_TOOL, GET_SALES_SUMMARY_TOOL]
+TOOLS = [UPLOAD_SALES_TOOL, CONFIRM_IMPORT_TOOL, UPLOAD_SALES_CSV_TOOL, LOG_DAILY_SALES_TOOL, GET_SALES_SUMMARY_TOOL]
 
 HANDLERS = {
     "upload_sales_data": handle_upload_sales_data,
+    "confirm_sales_import": handle_confirm_sales_import,
     "upload_sales_csv": handle_upload_sales_csv,
     "log_daily_sales": handle_log_daily_sales,
     "get_sales_summary": handle_get_sales_summary,

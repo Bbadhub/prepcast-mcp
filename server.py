@@ -509,7 +509,9 @@ def create_app() -> web.Application:
         except Exception as e:
             return web.json_response({"error": f"Upload failed: {e}"}, status=400)
 
-        from tools.upload_report import _detect_and_parse, _validate_records, _load_sales, _save_sales
+        from tools.upload_report import (
+            _detect_and_parse, _validate_records, _stage_import,
+        )
         import statistics as _stats
 
         records, parse_errors, fmt = _detect_and_parse(file_bytes=file_bytes, filename=filename)
@@ -527,25 +529,62 @@ def create_app() -> web.Application:
                 "details": warnings[:10],
             }, status=400)
 
-        existing = _load_sales(location_id)
-        combined = existing + clean
-        _save_sales(combined, location_id)
-        final = _load_sales(location_id)
-        revenues = [r["revenue"] for r in clean]
+        # Stage for review — don't save to history yet
+        import_id = _stage_import(clean, warnings, parse_errors, fmt, location_id)
 
+        revenues = [r["revenue"] for r in clean]
+        # Return preview for AI / frontend validation
         return web.json_response({
             "ok": True,
+            "staged": True,
+            "import_id": import_id,
             "format": fmt,
-            "imported": len(clean),
+            "record_count": len(clean),
             "skipped": len(records) - len(clean),
             "date_range": {"from": clean[0]["date"], "to": clean[-1]["date"]},
             "avg_revenue": round(_stats.mean(revenues), 0),
-            "total_history_days": len(final),
+            "sample": clean[:10],
             "warnings": warnings[:5],
             "parse_errors": parse_errors[:5],
+            "next_step": "Call confirm_sales_import tool (or POST /upload/confirm) to save",
         })
 
     app.router.add_post("/upload", handle_file_upload)
+
+    async def handle_upload_confirm(request: web.Request) -> web.StreamResponse:
+        """
+        POST /upload/confirm - Confirm staged import after AI review.
+        Body: {"exclude_dates": [...], "corrections": [...]}
+        """
+        api_key = request.headers.get("Authorization", "")
+        if api_key.startswith("Bearer "):
+            api_key = api_key[7:]
+
+        location_id = "default"
+        if api_key:
+            try:
+                from store import get_user_by_api_key
+                _u = get_user_by_api_key(api_key)
+                if _u:
+                    location_id = _u.get("location_id", "default")
+            except Exception:
+                pass
+
+        try:
+            body = await request.json()
+        except json.JSONDecodeError:
+            body = {}
+
+        from tools.upload_report import handle_confirm_sales_import
+        args = {
+            "_location_id": location_id,
+            "exclude_dates": body.get("exclude_dates", []),
+            "corrections": body.get("corrections", []),
+        }
+        result_text = await handle_confirm_sales_import(args)
+        return web.json_response({"ok": True, "result": result_text})
+
+    app.router.add_post("/upload/confirm", handle_upload_confirm)
 
     # SSE transport (registers /sse, /message, /health)
     SSETransport(app)
