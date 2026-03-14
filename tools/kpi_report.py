@@ -3,15 +3,13 @@ PrepCast - KPI Reporting Tools (MCP)
 
 These tools let Claude answer questions like:
   "How are my forecasts doing?"
-  "Compare all my stores"
-  "Which day of week drives the most revenue at store X?"
-  "Show me event impact across all locations"
+  "Which day of week drives the most revenue?"
+  "Show me event impact"
 
 Designed to produce rich text outputs that Claude renders as artifacts.
 
 Tools:
-  get_performance_report   - full KPI summary for one or all locations
-  compare_locations        - side-by-side comparison table (corporate)
+  get_performance_report   - full KPI summary for your store
   get_forecast_accuracy    - prediction vs actual breakdown
   get_revenue_trends       - weekly/monthly trend data with narrative
 """
@@ -23,7 +21,6 @@ from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional
 
 from store import (
-    list_location_ids,
     load_json,
     load_json_dict,
     get_location_name,
@@ -254,191 +251,21 @@ def _parse_date_safe(s: str) -> Optional[date]:
 GET_PERFORMANCE_REPORT_TOOL = {
     "name": "get_performance_report",
     "description": (
-        "Get a full KPI performance report for one location or all locations. "
+        "Get a full KPI performance report for your store. "
         "Shows revenue averages, day-of-week breakdown, forecast accuracy, event impact, "
-        "and monthly trends. Corporate users can specify location_id='ALL' to get a "
-        "combined report across every store. Great for generating Claude artifacts."
+        "and monthly trends. Great for generating Claude artifacts."
     ),
     "inputSchema": {
         "type": "object",
-        "properties": {
-            "location_id": {
-                "type": "string",
-                "description": (
-                    "Location ID to report on. Leave blank for your own store. "
-                    "Corporate users can pass 'ALL' for every location, "
-                    "or a specific location slug like 'op-163rd'."
-                ),
-            },
-        },
+        "properties": {},
         "required": [],
     },
 }
 
 
 async def handle_get_performance_report(arguments: dict) -> str:
-    location_id = (arguments.get("location_id") or "").strip()
-    is_all = location_id.upper() == "ALL" if location_id else False
-
-    if is_all:
-        ids = list_location_ids()
-        if not ids:
-            return "No locations found. Add sales data first."
-        parts = []
-        for lid in ids:
-            parts.append(_location_summary(lid))
-            parts.append("")
-        return "\n".join(parts)
-    else:
-        loc = location_id or "default"
-        return _location_summary(loc)
-
-
-# ---------------------------------------------------------------------------
-# Tool: compare_locations
-# ---------------------------------------------------------------------------
-
-COMPARE_LOCATIONS_TOOL = {
-    "name": "compare_locations",
-    "description": (
-        "Compare multiple store locations side by side. Shows a table with key metrics: "
-        "avg daily revenue, best day, forecast accuracy, trend, and top day of week. "
-        "Ideal for corporate analysis across a franchise group."
-    ),
-    "inputSchema": {
-        "type": "object",
-        "properties": {
-            "location_ids": {
-                "type": "string",
-                "description": (
-                    "Comma-separated location IDs to compare, or 'ALL' for every location. "
-                    "Example: 'op-163rd,kc-downtown,lenexa'"
-                ),
-            },
-            "metric": {
-                "type": "string",
-                "description": "Focus metric: 'revenue', 'accuracy', 'events', or 'trends'. Default: all.",
-            },
-        },
-        "required": [],
-    },
-}
-
-
-async def handle_compare_locations(arguments: dict) -> str:
-    raw = (arguments.get("location_ids") or "ALL").strip()
-    metric = (arguments.get("metric") or "all").lower()
-
-    if raw.upper() == "ALL":
-        ids = list_location_ids()
-    else:
-        ids = [x.strip() for x in raw.split(",") if x.strip()]
-
-    if not ids:
-        return "No locations found."
-
-    rows = []
-    for lid in ids:
-        name = get_location_name(lid)
-        sales = load_json(lid, SALES_FILE)
-        forecast_log = load_json(lid, FORECAST_LOG_FILE)
-        events = load_json(lid, EVENT_OUTCOMES_FILE)
-
-        stats = _sales_stats(sales)
-        stats_30 = _sales_stats(sales, days=30)
-        accuracy = _forecast_accuracy(sales, forecast_log)
-
-        # trend
-        prev30_recs = [
-            r for r in sales
-            if _parse_date_safe(r.get("date", "")) is not None
-            and date.today() - timedelta(days=60) <= _parse_date_safe(r["date"]) < date.today() - timedelta(days=30)
-        ]
-        stats_prev30 = _sales_stats(prev30_recs)
-
-        if not stats.get("empty") and not stats_prev30.get("empty"):
-            trend_pct = (stats_30.get("avg_daily", 0) - stats_prev30["avg_daily"]) / stats_prev30["avg_daily"] * 100
-            trend_str = f"{'+' if trend_pct >= 0 else ''}{trend_pct:.1f}%"
-        else:
-            trend_str = "N/A"
-
-        # best day of week
-        dow = stats.get("by_dow", {})
-        best_dow = max(dow, key=dow.get)[:3] if dow else "N/A"
-
-        rows.append({
-            "id": lid,
-            "name": name[:24],
-            "days": stats.get("days", 0),
-            "avg_daily": stats.get("avg_daily", 0),
-            "avg_30d": stats_30.get("avg_daily", 0),
-            "trend": trend_str,
-            "best": stats.get("best", 0),
-            "best_dow": best_dow,
-            "accuracy": f"{accuracy['accuracy_pct']}%" if accuracy.get("available", 0) > 0 else "N/A",
-            "forecasts": accuracy.get("available", 0),
-            "events": len(events),
-        })
-
-    if not rows:
-        return "No data available for the requested locations."
-
-    # Header
-    lines = [
-        "LOCATION COMPARISON",
-        "=" * 90,
-        "",
-    ]
-
-    if metric in ("all", "revenue"):
-        lines += [
-            "REVENUE OVERVIEW",
-            f"  {'Location':<26} {'Days':>5} {'Avg/Day':>10} {'30d Avg':>10} {'Trend':>8} {'Best Day':>10} {'Best DoW':>9}",
-            f"  {'-'*26} {'-'*5} {'-'*10} {'-'*10} {'-'*8} {'-'*10} {'-'*9}",
-        ]
-        for r in rows:
-            lines.append(
-                f"  {r['name']:<26} {r['days']:>5} "
-                f"${r['avg_daily']:>9,.0f} ${r['avg_30d']:>9,.0f} "
-                f"{r['trend']:>8} ${r['best']:>9,.0f} {r['best_dow']:>9}"
-            )
-        lines.append("")
-
-    if metric in ("all", "accuracy"):
-        lines += [
-            "FORECAST ACCURACY",
-            f"  {'Location':<26} {'Forecasts':>10} {'Accuracy':>10} {'Events':>8}",
-            f"  {'-'*26} {'-'*10} {'-'*10} {'-'*8}",
-        ]
-        for r in rows:
-            lines.append(
-                f"  {r['name']:<26} {r['forecasts']:>10} {r['accuracy']:>10} {r['events']:>8}"
-            )
-        lines.append("")
-
-    if metric in ("all", "trends"):
-        lines += ["MONTH-OVER-MONTH TRENDS (last 6 months)"]
-        for lid in ids:
-            sales = load_json(lid, SALES_FILE)
-            stats = _sales_stats(sales)
-            by_month = stats.get("by_month", {})
-            if by_month:
-                name = get_location_name(lid)[:20]
-                lines.append(f"\n  {name}:")
-                for month, total in sorted(by_month.items()):
-                    bar = "#" * int(total / max(by_month.values()) * 25)
-                    lines.append(f"    {month}  {bar:<25} ${total:,.0f}")
-
-    # Rankings
-    if len(rows) > 1 and metric in ("all", "revenue"):
-        ranked = sorted(rows, key=lambda r: r["avg_30d"], reverse=True)
-        lines += [
-            "RANKING BY 30-DAY AVG REVENUE",
-        ]
-        for i, r in enumerate(ranked, 1):
-            lines.append(f"  {i}. {r['name']:<26}  ${r['avg_30d']:,.0f}/day  {r['trend']}")
-
-    return "\n".join(lines)
+    location_id = arguments.get("_location_id", "default")
+    return _location_summary(location_id)
 
 
 # ---------------------------------------------------------------------------
@@ -665,14 +492,12 @@ async def handle_get_revenue_trends(arguments: dict) -> str:
 
 TOOLS = [
     GET_PERFORMANCE_REPORT_TOOL,
-    COMPARE_LOCATIONS_TOOL,
     GET_FORECAST_ACCURACY_TOOL,
     GET_REVENUE_TRENDS_TOOL,
 ]
 
 HANDLERS = {
     "get_performance_report": handle_get_performance_report,
-    "compare_locations": handle_compare_locations,
     "get_forecast_accuracy": handle_get_forecast_accuracy,
     "get_revenue_trends": handle_get_revenue_trends,
 }

@@ -420,7 +420,18 @@ class UsageTracker:
         state = {
             "api_keys": {k: asdict(v) for k, v in self._api_keys.items()},
             "usage": {
-                k: {**asdict(v), "calls_by_tool": dict(v.calls_by_tool)}
+                k: {
+                    "user_id": v.user_id,
+                    "total_calls": v.total_calls,
+                    "total_tokens": v.total_tokens,
+                    "total_cost_usd": v.total_cost_usd,
+                    "calls_by_tool": dict(v.calls_by_tool),
+                    "period_start": v.period_start,
+                    "period_end": v.period_end,
+                    "stripe_customer_id": v.stripe_customer_id,
+                    "stripe_subscription_id": v.stripe_subscription_id,
+                    "tier": v.tier,
+                }
                 for k, v in self._usage.items()
             },
             "affiliates": {k: asdict(v) for k, v in self._affiliates.items()},
@@ -497,13 +508,17 @@ def create_billing_middleware(tracker: UsageTracker):
             result = {"content": [{"type": "text", "text": f"Error: {error_msg}"}]}
 
         duration_ms = (time.time() - start) * 1000
-        tracker.record_usage(
-            api_key=api_key,
-            tool_name=tool_name,
-            duration_ms=duration_ms,
-            success=success,
-            error=error_msg,
-        )
+        try:
+            tracker.record_usage(
+                api_key=api_key,
+                tool_name=tool_name,
+                duration_ms=duration_ms,
+                success=success,
+                error=error_msg,
+            )
+        except Exception:
+            # Billing/usage tracking must never crash the tool response
+            pass
         # Handlers return either a string or already-formatted {"content": [...]} dict
         if isinstance(result, dict):
             return result

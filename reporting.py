@@ -20,6 +20,7 @@ DATA_DIR = Path(os.environ.get("PREPCAST_DATA_DIR", "/tmp/prepcast"))
 SALES_FILE = DATA_DIR / "sales_history.json"
 EVENT_OUTCOMES_FILE = DATA_DIR / "event_outcomes.json"
 FORECAST_LOG_FILE = DATA_DIR / "forecast_log.json"
+PREP_OUTCOMES_FILE = DATA_DIR / "prep_outcomes.json"
 
 
 def _load(path: Path) -> List:
@@ -166,6 +167,34 @@ def _get_kpi_summary() -> Dict:
                 "samples": len(vals),
             })
 
+    # --- Prep outcomes (food cost tracking) ---
+    prep_outcomes = _load(PREP_OUTCOMES_FILE)
+    if not isinstance(prep_outcomes, list):
+        prep_outcomes = []
+
+    prep_cost_data = []
+    for o in prep_outcomes[-30:]:
+        rev = o.get("actual_revenue", 0)
+        if not rev:
+            continue
+        beef_cost = (o.get("beef_cases_used") or 0) * 500
+        potato_cost = (o.get("potato_bags_used") or 0) * 22
+        bacon_cost = ((o.get("bacon_sheets_used") or 0) * 20 / 240) * 55
+        total = beef_cost + bacon_cost + potato_cost
+        prep_cost_data.append({
+            "date": o.get("date", ""),
+            "revenue": rev,
+            "food_cost": round(total, 0),
+            "food_cost_pct": round(total / rev * 100, 1) if rev else 0,
+        })
+
+    ran_out_counts = {}
+    for o in prep_outcomes[-30:]:
+        for item in (o.get("ran_out_of") or "").lower().split(","):
+            item = item.strip()
+            if item:
+                ran_out_counts[item] = ran_out_counts.get(item, 0) + 1
+
     return {
         "summary": {
             "total_days_recorded": len(sales),
@@ -189,6 +218,11 @@ def _get_kpi_summary() -> Dict:
         "event_impact": {
             "total_events_logged": len(event_impact),
             "events": sorted(event_impact, key=lambda x: x["date"], reverse=True)[:10],
+        },
+        "prep_efficiency": {
+            "days_logged": len(prep_outcomes),
+            "food_cost_trend": prep_cost_data,
+            "ran_out_of": ran_out_counts,
         },
         "charts": {
             "weekly_revenue": weekly_data,
