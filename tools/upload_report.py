@@ -87,13 +87,19 @@ def _validate_records(records: List[Dict]) -> Tuple[List[Dict], List[str]]:
     Validate parsed records and return (clean_records, warnings).
     - Rejects future dates
     - Flags revenue outside reasonable range
-    - Flags duplicate dates
+    - Deduplicates (keeps latest value per date)
+    - Detects statistical outliers (>3x or <0.3x median)
+    - Flags $0 revenue as likely parsing error
     - Detects date gaps
+    - Detects overlap with existing history
     """
     clean = []
     warnings = []
     today = date.today()
-    seen_dates = set()
+
+    # --- Pass 1: basic validation, deduplicate by date (keep last) ---
+    by_date: Dict[str, Dict] = {}
+    dup_count = 0
 
     for r in records:
         d = r.get("date", "")
@@ -108,31 +114,57 @@ def _validate_records(records: List[Dict]) -> Tuple[List[Dict], List[str]]:
             warnings.append(f"  SKIPPED: invalid date '{d}'")
             continue
 
+        # $0 revenue — almost always a parsing error
+        if rev == 0:
+            warnings.append(f"  SKIPPED {d}: $0 revenue (likely parsing error)")
+            continue
+
         # Revenue sanity
         if rev < MIN_REVENUE:
             warnings.append(f"  WARNING {d}: revenue ${rev:,.0f} seems too low (< ${MIN_REVENUE}). Included but flagged.")
         elif rev > MAX_REVENUE:
             warnings.append(f"  WARNING {d}: revenue ${rev:,.0f} seems too high (> ${MAX_REVENUE:,}). Included but flagged.")
 
-        # Duplicate
-        if d in seen_dates:
-            warnings.append(f"  DUPLICATE {d}: latest value ${rev:,.0f} will overwrite earlier entry")
-        seen_dates.add(d)
+        # Deduplicate: keep latest value per date
+        if d in by_date:
+            dup_count += 1
+        by_date[d] = r
 
-        clean.append(r)
+    if dup_count:
+        warnings.append(f"  DEDUPED: {dup_count} duplicate date(s) found — kept latest value for each")
 
-    # Gap detection
-    if len(clean) >= 7:
-        dates_sorted = sorted(set(r["date"] for r in clean))
+    clean = sorted(by_date.values(), key=lambda x: x["date"])
+
+    # --- Pass 2: statistical outlier detection ---
+    if len(clean) >= 5:
+        revenues = [r["revenue"] for r in clean]
+        med = statistics.median(revenues)
+        if med > 0:
+            for r in clean:
+                ratio = r["revenue"] / med
+                if ratio > 3.0:
+                    warnings.append(
+                        f"  OUTLIER {r['date']}: ${r['revenue']:,.0f} is {ratio:.1f}x the median (${med:,.0f}). "
+                        f"Possible OCR/parsing error — should be ${r['revenue']/10:,.0f}?"
+                    )
+                elif ratio < 0.3:
+                    warnings.append(
+                        f"  OUTLIER {r['date']}: ${r['revenue']:,.0f} is only {ratio:.1f}x the median (${med:,.0f}). "
+                        f"Possible decimal shift — should be ${r['revenue']*10:,.0f}?"
+                    )
+
+    # --- Pass 3: gap detection ---
+    if len(clean) >= 5:
+        dates_sorted = sorted(r["date"] for r in clean)
         gaps = []
         for i in range(1, len(dates_sorted)):
             d1 = date.fromisoformat(dates_sorted[i - 1])
             d2 = date.fromisoformat(dates_sorted[i])
             gap_days = (d2 - d1).days
-            if gap_days > 3:  # more than 3 days missing
+            if gap_days > 2:
                 gaps.append(f"{dates_sorted[i-1]} to {dates_sorted[i]} ({gap_days} days)")
         if gaps:
-            warnings.append(f"  DATE GAPS found ({len(gaps)}): " + "; ".join(gaps[:3]))
+            warnings.append(f"  DATE GAPS ({len(gaps)}): " + "; ".join(gaps[:5]))
 
     return clean, warnings
 
@@ -252,7 +284,7 @@ def _parse_xlsx(file_bytes: bytes) -> Tuple[List[Dict], List[str]]:
                     continue
                 if date_col is None and (isinstance(cell, datetime) or _parse_date(str(cell))):
                     date_col = j
-                elif rev_col is None and isinstance(cell, (int, float)) and cell > 50:
+                elif rev_col is None and isinstance(cell, (int, float)) and MIN_REVENUE <= cell <= MAX_REVENUE:
                     rev_col = j
             if date_col is not None and rev_col is not None:
                 header_idx = max(0, i - 1)
@@ -401,8 +433,13 @@ def _detect_and_parse(
             records, errors = _parse_pdf(file_bytes)
             return records, errors, "pdf"
 
-        if ext == "csv" or ext == "tsv":
-            text = file_bytes.decode("utf-8", errors="ignore")
+        if ext in ("csv", "tsv") or not ext:
+            # Try UTF-8 first, fall back to latin-1 (which never fails)
+            try:
+                text = file_bytes.decode("utf-8")
+            except UnicodeDecodeError:
+                text = file_bytes.decode("latin-1")
+            fmt = ext or "csv"
             # Fall through to CSV parsing below
 
     # Text-based parsing
@@ -412,12 +449,24 @@ def _detect_and_parse(
             data = json.loads(text)
             if isinstance(data, list) and data and "date" in data[0]:
                 records = []
-                for item in data:
+                json_errors = []
+                for idx, item in enumerate(data):
+                    if not isinstance(item, dict):
+                        json_errors.append(f"Row {idx+1}: not a JSON object")
+                        continue
                     d = _parse_date(str(item.get("date", "")))
                     r = item.get("revenue")
-                    if d and r is not None:
+                    if not d:
+                        json_errors.append(f"Row {idx+1}: could not parse date '{item.get('date', '')}'")
+                        continue
+                    if r is None:
+                        json_errors.append(f"Row {idx+1}: missing 'revenue' field")
+                        continue
+                    try:
                         records.append({"date": d, "revenue": float(r)})
-                return records, [], "json"
+                    except (ValueError, TypeError):
+                        json_errors.append(f"Row {idx+1}: invalid revenue '{r}'")
+                return records, json_errors, "json"
         except (json.JSONDecodeError, TypeError, ValueError):
             pass
 
@@ -499,7 +548,7 @@ def _stage_import(records: List[Dict], warnings: List[str], parse_errors: List[s
 
 def _build_ai_review_preview(records: List[Dict], warnings: List[str],
                               parse_errors: List[str], fmt: str,
-                              import_id: str) -> str:
+                              import_id: str, location_id: str = "default") -> str:
     """Build a preview string for the AI to review before confirming import."""
     revenues = [r["revenue"] for r in records]
     avg_rev = statistics.mean(revenues) if revenues else 0
@@ -513,9 +562,25 @@ def _build_ai_review_preview(records: List[Dict], warnings: List[str],
         f"  Avg revenue:   ${avg_rev:,.0f}/day",
         f"  Min:           ${min(revenues):,.0f}",
         f"  Max:           ${max(revenues):,.0f}",
-        "",
-        f"--- SAMPLE DATA (first 10 rows) ---",
     ]
+
+    # Check overlap with existing history
+    existing = _load_sales(location_id)
+    if existing:
+        existing_dates = {r["date"] for r in existing}
+        new_dates = {r["date"] for r in records}
+        overlap = existing_dates & new_dates
+        if overlap:
+            overlap_sorted = sorted(overlap)
+            lines.append(f"  Overlap:       {len(overlap)} dates already in history (will be overwritten)")
+            if len(overlap) <= 5:
+                lines.append(f"                 {', '.join(overlap_sorted)}")
+            else:
+                lines.append(f"                 {', '.join(overlap_sorted[:3])} ... {', '.join(overlap_sorted[-2:])}")
+        lines.append(f"  Existing:      {len(existing)} days in history")
+
+    lines.append("")
+    lines.append(f"--- SAMPLE DATA (first 10 rows) ---")
 
     for r in records[:10]:
         d = r["date"]
@@ -562,6 +627,38 @@ def _build_ai_review_preview(records: List[Dict], warnings: List[str],
             lines.append(f"  {w}")
         if len(warnings) > 8:
             lines.append(f"  ... and {len(warnings) - 8} more")
+
+    # Auto-suggest corrections for obvious outliers
+    suggested_corrections = []
+    suggested_exclusions = []
+    if len(records) >= 5:
+        med = statistics.median(revenues)
+        if med > 0:
+            for r in records:
+                ratio = r["revenue"] / med
+                if ratio > 8:
+                    # Likely a 10x OCR error
+                    suggested_corrections.append({"date": r["date"], "from": r["revenue"], "to": round(r["revenue"] / 10, 2)})
+                elif ratio < 0.1:
+                    # Likely a 10x decimal shift the other way
+                    suggested_corrections.append({"date": r["date"], "from": r["revenue"], "to": round(r["revenue"] * 10, 2)})
+                elif r["revenue"] == 0:
+                    suggested_exclusions.append(r["date"])
+
+    if suggested_corrections:
+        lines.append("")
+        lines.append("--- SUGGESTED CORRECTIONS ---")
+        for sc in suggested_corrections[:5]:
+            lines.append(f"  {sc['date']}: ${sc['from']:,.0f} → ${sc['to']:,.0f} (likely decimal error)")
+        lines.append("")
+        corr_json = json.dumps([{"date": c["date"], "revenue": c["to"]} for c in suggested_corrections])
+        lines.append(f'  To apply: confirm_sales_import(corrections={corr_json})')
+
+    if suggested_exclusions:
+        lines.append("")
+        lines.append("--- SUGGESTED EXCLUSIONS ---")
+        lines.append(f"  Dates to exclude: {json.dumps(suggested_exclusions)}")
+        lines.append(f'  To apply: confirm_sales_import(exclude_dates={json.dumps(suggested_exclusions)})')
 
     lines.append("")
     lines.append("--- AI VALIDATION CHECKLIST ---")
@@ -627,7 +724,7 @@ async def handle_upload_sales_data(arguments: dict) -> str:
                                fmt, location_id)
 
     return _build_ai_review_preview(clean_records, validation_warnings,
-                                     parse_errors, fmt, import_id)
+                                     parse_errors, fmt, import_id, location_id)
 
 
 # ===========================================================================
