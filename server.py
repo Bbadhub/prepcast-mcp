@@ -126,64 +126,75 @@ async def handle_jsonrpc(message: Dict[str, Any], api_key: str = "", session_id:
                 },
             }
 
-        # --- Inject location_id from bearer token into arguments -----------
-        if api_key and "_location_id" not in arguments:
-            try:
-                from store import get_user_by_api_key
-                _u = get_user_by_api_key(api_key)
-                if _u:
-                    arguments = dict(arguments)
-                    arguments["_location_id"] = _u.get("location_id", "default")
-                    arguments["_user_role"] = _u.get("role", "store")
-            except Exception:
-                pass
+        try:
+            # --- Inject location_id from bearer token into arguments -----------
+            if api_key and "_location_id" not in arguments:
+                try:
+                    from store import get_user_by_api_key
+                    _u = get_user_by_api_key(api_key)
+                    if _u:
+                        arguments = dict(arguments)
+                        arguments["_location_id"] = _u.get("location_id", "default")
+                        arguments["_user_role"] = _u.get("role", "store")
+                except Exception:
+                    pass
 
-        # --- Middleware: pull enriched context before tool executes --------
-        sync_engine = get_sync_engine()
-        _context = await sync_engine.get_context(tool_name, str(arguments))
-        # Context is available to handlers that accept it; currently informational.
-        # Future: inject _context into arguments or handler kwargs as needed.
+            # --- Middleware: pull enriched context before tool executes --------
+            sync_engine = get_sync_engine()
+            _context = await sync_engine.get_context(tool_name, str(arguments))
+            # Context is available to handlers that accept it; currently informational.
+            # Future: inject _context into arguments or handler kwargs as needed.
 
-        # --- Session tracking (pre-call) -----------------------------------
-        session_mgr = get_session_manager()
-        session_mgr.get_or_create_session(session_id, user_id=api_key or "anonymous")
+            # --- Session tracking (pre-call) -----------------------------------
+            session_mgr = get_session_manager()
+            session_mgr.get_or_create_session(session_id, user_id=api_key or "anonymous")
 
-        import time as _time
-        _t0 = _time.monotonic()
+            import time as _time
+            _t0 = _time.monotonic()
 
-        # --- Run through billing middleware (auth, rate limit, metering) ---
-        result = await billing_middleware(tool_name, arguments, api_key, handler)
+            # --- Run through billing middleware (auth, rate limit, metering) ---
+            result = await billing_middleware(tool_name, arguments, api_key, handler)
 
-        _duration_ms = (_time.monotonic() - _t0) * 1000
-        _success = "error" not in result
+            _duration_ms = (_time.monotonic() - _t0) * 1000
+            _success = "error" not in result
 
-        # --- Middleware: capture + sync signal (non-blocking) ---------------
-        asyncio.create_task(sync_engine.capture_and_sync(
-            tool_name=tool_name,
-            arguments=arguments,
-            user_id=api_key or "anonymous",
-            session_id=session_id,
-            result=result,
-            duration_ms=_duration_ms,
-            success=_success,
-        ))
+            # --- Middleware: capture + sync signal (non-blocking) ---------------
+            asyncio.create_task(sync_engine.capture_and_sync(
+                tool_name=tool_name,
+                arguments=arguments,
+                user_id=api_key or "anonymous",
+                session_id=session_id,
+                result=result,
+                duration_ms=_duration_ms,
+                success=_success,
+            ))
 
-        # --- Session tracking (post-call) ----------------------------------
-        session_mgr.update_session(session_id, tool_name)
+            # --- Session tracking (post-call) ----------------------------------
+            session_mgr.update_session(session_id, tool_name)
 
-        # If billing returned an error dict, forward it
-        if "error" in result:
+            # If billing returned an error dict, forward it
+            if "error" in result:
+                return {
+                    "jsonrpc": "2.0",
+                    "id": msg_id,
+                    "error": result["error"],
+                }
+
             return {
                 "jsonrpc": "2.0",
                 "id": msg_id,
-                "error": result["error"],
+                "result": result,
             }
 
-        return {
-            "jsonrpc": "2.0",
-            "id": msg_id,
-            "result": result,
-        }
+        except Exception as exc:
+            logger.exception("Unhandled error executing tool %s", tool_name)
+            return {
+                "jsonrpc": "2.0",
+                "id": msg_id,
+                "result": {
+                    "content": [{"type": "text", "text": f"Internal error: {exc}"}],
+                },
+            }
 
     # --- ping --------------------------------------------------------------
     if method == "ping":
