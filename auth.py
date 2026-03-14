@@ -79,11 +79,7 @@ def add_auth_routes(app: web.Application, usage_tracker):
         password = data.get("password") or ""
         name = (data.get("name") or "").strip()
         location_name = (data.get("location_name") or "").strip()
-        role = (data.get("role") or "store").strip().lower()
-        # Only allow corporate role if a secret is provided
-        corporate_secret = os.environ.get("CORPORATE_SIGNUP_SECRET", "")
-        if role == "corporate" and data.get("corporate_secret", "") != corporate_secret:
-            role = "store"
+        role = "store"  # single-store management only
 
         if not email or "@" not in email:
             return web.json_response({"error": "Valid email required"}, status=400)
