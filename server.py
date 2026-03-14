@@ -474,6 +474,79 @@ def create_app() -> web.Application:
     app.router.add_get("/consumer/tools", handle_consumer_tools)
     app.router.add_post("/consumer/run", handle_consumer_run)
 
+    # --- File upload endpoint (CSV, XLSX, PDF) ---
+    async def handle_file_upload(request: web.Request) -> web.StreamResponse:
+        """
+        POST /upload - Upload a sales data file (CSV, XLSX, or PDF).
+        Accepts multipart/form-data with a 'file' field.
+        Returns parsed + validated results.
+        """
+        api_key = request.headers.get("Authorization", "")
+        if api_key.startswith("Bearer "):
+            api_key = api_key[7:]
+
+        location_id = "default"
+        if api_key:
+            try:
+                from store import get_user_by_api_key
+                _u = get_user_by_api_key(api_key)
+                if _u:
+                    location_id = _u.get("location_id", "default")
+            except Exception:
+                pass
+
+        try:
+            reader = await request.multipart()
+            field = await reader.next()
+            if field is None or field.name != "file":
+                return web.json_response({"error": "Expected 'file' field in multipart upload"}, status=400)
+
+            filename = field.filename or "upload.csv"
+            file_bytes = await field.read(decode=False)
+            if len(file_bytes) > 10 * 1024 * 1024:  # 10 MB max
+                return web.json_response({"error": "File too large (10 MB max)"}, status=400)
+
+        except Exception as e:
+            return web.json_response({"error": f"Upload failed: {e}"}, status=400)
+
+        from tools.upload_report import _detect_and_parse, _validate_records, _load_sales, _save_sales
+        import statistics as _stats
+
+        records, parse_errors, fmt = _detect_and_parse(file_bytes=file_bytes, filename=filename)
+        if not records:
+            return web.json_response({
+                "error": "Could not parse any records",
+                "format": fmt,
+                "details": parse_errors[:5],
+            }, status=400)
+
+        clean, warnings = _validate_records(records)
+        if not clean:
+            return web.json_response({
+                "error": "All records failed validation",
+                "details": warnings[:10],
+            }, status=400)
+
+        existing = _load_sales(location_id)
+        combined = existing + clean
+        _save_sales(combined, location_id)
+        final = _load_sales(location_id)
+        revenues = [r["revenue"] for r in clean]
+
+        return web.json_response({
+            "ok": True,
+            "format": fmt,
+            "imported": len(clean),
+            "skipped": len(records) - len(clean),
+            "date_range": {"from": clean[0]["date"], "to": clean[-1]["date"]},
+            "avg_revenue": round(_stats.mean(revenues), 0),
+            "total_history_days": len(final),
+            "warnings": warnings[:5],
+            "parse_errors": parse_errors[:5],
+        })
+
+    app.router.add_post("/upload", handle_file_upload)
+
     # SSE transport (registers /sse, /message, /health)
     SSETransport(app)
 
