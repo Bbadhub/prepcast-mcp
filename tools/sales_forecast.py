@@ -34,6 +34,35 @@ def _baseline_by_dow(records: List[Dict]) -> Dict[str, float]:
     return {dow: statistics.mean(vals) for dow, vals in buckets.items() if vals}
 
 
+def _recent_dow_averages(records: List[Dict], target_date: date, windows: List[int]) -> Dict[int, Optional[float]]:
+    """
+    Compute recent same-day-of-week averages for the given target date over
+    the specified window sizes (in weeks). Returns a mapping:
+      window_size_in_weeks -> average_revenue_or_None
+
+    Example: {4: 4800.0, 8: 4950.0}
+    """
+    results: Dict[int, Optional[float]] = {}
+    target_dow = _day_name(target_date)
+
+    # Parse once to avoid repeated conversions
+    parsed: List[tuple[date, float]] = []
+    for r in records:
+        try:
+            d = date.fromisoformat(r["date"])
+            rev = float(r["revenue"])
+            parsed.append((d, rev))
+        except Exception:
+            continue
+
+    for w in windows:
+        cutoff = target_date - timedelta(weeks=w)
+        vals = [rev for d, rev in parsed if cutoff <= d < target_date and _day_name(d) == target_dow]
+        results[w] = statistics.mean(vals) if vals else None
+
+    return results
+
+
 def _recency_weighted_forecast(records: List[Dict], target_dow: str, target_date: date) -> Optional[float]:
     """
     Operator-validated forecasting method (per Five Guys manager feedback):
@@ -145,14 +174,30 @@ async def handle_forecast_sales(arguments: dict) -> str:
 
     # Fallback: DOW average baseline + recent trend multiplier
     baselines = _baseline_by_dow(records)
-    base = baselines.get(dow)
-    if projected is None:
-        if base is None:
+    # Operator-facing baseline: blend 4-week and 8-week same-DOW averages when available.
+    recent_avgs = _recent_dow_averages(records, td, windows=[4, 8])
+    avg_4w = recent_avgs.get(4)
+    avg_8w = recent_avgs.get(8)
+
+    blended_baseline = None
+    if avg_4w is not None and avg_8w is not None:
+        # Bias toward 8 weeks per GM preference.
+        blended_baseline = avg_4w * 0.30 + avg_8w * 0.70
+    elif avg_8w is not None:
+        blended_baseline = avg_8w
+    elif avg_4w is not None:
+        blended_baseline = avg_4w
+
+    # Fallback: historical all-time DOW average + recent trend if recent windows are thin.
+    base_dow_all_time = baselines.get(dow)
+    if blended_baseline is None:
+        if base_dow_all_time is None:
             return f"No historical data for {dow}s yet. Upload more sales reports to build a baseline."
         trend = _recent_trend(records)
-        projected = base * (trend if trend else 1.0)
-    elif base is None:
-        base = projected  # use recency estimate as display baseline
+        blended_baseline = base_dow_all_time * (trend if trend else 1.0)
+
+    # Use blended baseline as primary projection unless recency-weighted method exists and you prefer it.
+    projected = blended_baseline
 
     event_note = ""
     if event_multiplier and event_multiplier > 0:
@@ -176,14 +221,37 @@ async def handle_forecast_sales(arguments: dict) -> str:
     lines = [
         f"SALES FORECAST - {td.strftime('%A, %B %d %Y')}",
         f"",
-        f"  Projected Revenue:  ${projected:,.0f}",
-        f"  Confidence Range:   ${low:,.0f} - ${high:,.0f}  (+/-{variance_pct:.0f}%)",
-        f"  {dow} Baseline:      ${base:,.0f}  (all-time avg for {dow}s)",
-        f"  Method:             Last week 50% / Last 4 wks 30% / Last quarter 20%",
+    ]
+
+    # Baseline breakdown: 4-week vs 8-week vs blended.
+    lines.append("  BASELINE (same day-of-week):")
+    if avg_4w is not None:
+        lines.append(f"    4-week average:      ${avg_4w:,.0f}")
+    else:
+        lines.append(f"    4-week average:      n/a (not enough history)")
+    if avg_8w is not None:
+        lines.append(f"    8-week average:      ${avg_8w:,.0f}")
+    else:
+        lines.append(f"    8-week average:      n/a (not enough history)")
+
+    lines.append(f"    Blended baseline:    ${blended_baseline:,.0f}  (30% 4w / 70% 8w when both are available)")
+    if base_dow_all_time is not None:
+        lines.append(f"    All-time {dow} avg:   ${base_dow_all_time:,.0f}  (for reference)")
+
+    lines += [
+        f"",
+        f"  ADJUSTMENTS:",
     ]
     if event_note:
-        lines.append(f"  {event_note}")
+        lines.append(f"    Event:               {event_note}")
+    else:
+        lines.append(f"    Event:               None (no event multiplier applied)")
+
     lines += [
+        f"",
+        f"  FINAL FORECAST:",
+        f"    Projected Revenue:   ${projected:,.0f}",
+        f"    Confidence Range:    ${low:,.0f} - ${high:,.0f}  (+/-{variance_pct:.0f}%)",
         f"",
         f"Based on {len(records)} days of sales history.",
         f"Run generate_prep_list with projected_revenue={projected:.0f} to get your prep list.",
