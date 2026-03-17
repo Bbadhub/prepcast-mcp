@@ -589,6 +589,16 @@ def create_app() -> web.Application:
     app.router.add_get("/signup", handle_signup_page)
     app.router.add_get("/signup.html", handle_signup_page)
 
+    # Getting started page
+    async def handle_getting_started(_: web.Request) -> web.StreamResponse:
+        getting_started_path = site_dir / "getting-started.html"
+        if getting_started_path.exists():
+            return web.FileResponse(getting_started_path)
+        return web.Response(status=404, text="Getting started page not found")
+
+    app.router.add_get("/getting-started", handle_getting_started)
+    app.router.add_get("/getting-started.html", handle_getting_started)
+
     # CORS middleware for browser clients
     @web.middleware
     async def cors_middleware(request, handler):

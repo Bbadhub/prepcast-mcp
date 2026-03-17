@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Getting Started - PrepCast</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <nav class="bg-white border-b border-gray-100">
+    <div class="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+      <a href="/" class="font-bold text-gray-900">PrepCast</a>
+      <div class="flex items-center gap-3 text-sm">
+        <a href="/signup" class="text-gray-500 hover:text-gray-800">Sign up</a>
+        <a href="/login" class="text-gray-500 hover:text-gray-800">Sign in</a>
+        <a href="/dashboard" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg font-medium">Dashboard</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="max-w-4xl mx-auto px-4 py-10">
+    <h1 class="text-3xl font-bold text-gray-900 mb-2">Getting Started with PrepCast + Claude</h1>
+    <p class="text-gray-600 mb-8">Follow these 3 steps and you will have forecasts running in a few minutes.</p>
+
+    <section class="bg-white border border-gray-100 rounded-2xl p-6 mb-5">
+      <h2 class="text-lg font-semibold text-gray-900 mb-3">Step 1: Connect the custom connector</h2>
+      <ol class="list-decimal list-inside text-sm text-gray-700 space-y-1">
+        <li>Open Claude, then go to <strong>Customize -> Connectors</strong>.</li>
+        <li>Click <strong>Add Custom</strong>.</li>
+        <li>Use this URL: <code class="bg-gray-100 px-1 rounded" id="sseUrl"></code></li>
+        <li>Add header: <code class="bg-gray-100 px-1 rounded">Authorization: Bearer &lt;your_token&gt;</code></li>
+      </ol>
+      <button onclick="copySse()" class="mt-3 text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-md">Copy SSE URL</button>
+    </section>
+
+    <section class="bg-white border border-gray-100 rounded-2xl p-6 mb-5">
+      <h2 class="text-lg font-semibold text-gray-900 mb-3">Step 2: Load your daily sales data</h2>
+      <p class="text-sm text-gray-700 mb-2">Best format is daily totals (one row per day):</p>
+      <pre class="text-xs bg-gray-50 border border-gray-200 rounded-lg p-3 overflow-x-auto">Date,Revenue
+2026-03-01,7821
+2026-03-02,8150
+2026-03-03,7990</pre>
+      <p class="text-xs text-gray-500 mt-2">Tip: transaction-level PDFs are less reliable than CSV/XLSX daily totals.</p>
+    </section>
+
+    <section class="bg-white border border-gray-100 rounded-2xl p-6 mb-5">
+      <h2 class="text-lg font-semibold text-gray-900 mb-3">Step 3: Run the starter prompt in Claude</h2>
+      <div class="flex items-center justify-between gap-2 mb-2">
+        <p class="text-sm text-gray-600">Paste this as your first message in a new chat:</p>
+        <button onclick="copyStarterPrompt()" class="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-md">Copy prompt</button>
+      </div>
+      <textarea id="starterPrompt" readonly class="w-full h-64 bg-gray-50 border border-gray-200 rounded-lg p-3 font-mono text-xs text-gray-800 resize-y"></textarea>
+    </section>
+
+    <section class="bg-indigo-50 border border-indigo-100 rounded-2xl p-5">
+      <h3 class="font-semibold text-indigo-900 mb-1">One-day forecast example</h3>
+      <p class="text-sm text-indigo-800">Use PrepCast to forecast 2026-03-12 and show the full 4w/8w blend math, weather/event multipliers, and low/base/high range.</p>
+    </section>
+  </main>
+
+  <script>
+    document.getElementById('sseUrl').textContent = window.location.origin + '/sse';
+
+    function starterPromptText() {
+      return [
+        'Use PrepCast tools only. Start by confirming connection with get_status.',
+        '',
+        'Then do this workflow in order:',
+        '1) Run get_sales_summary.',
+        '2) If daily sales history is missing or too short, ask me for the exact data needed and wait.',
+        '3) If I provide files/text, use upload_sales_data (or upload_sales_csv) to ingest it.',
+        '4) Run analyze_history and summarize key weekday patterns.',
+        '5) Build a forecast for [TARGET_DATE] using:',
+        '   - 4-week same-weekday average',
+        '   - 8-week same-weekday average',
+        '   - blended baseline = (0.30 * 4w) + (0.70 * 8w)',
+        '6) Apply event and weather adjustments and show each multiplier and formula.',
+        '7) Output:',
+        '   - Data quality check',
+        '   - Step-by-step math',
+        '   - Final forecast (Low/Base/High)',
+        '   - Prep/staffing recommendations',
+        '',
+        'Rules:',
+        '- Be transparent with assumptions.',
+        '- If data is incomplete, stop and ask before guessing.',
+        '- Show all calculations clearly.',
+      ].join('\n');
+    }
+
+    function copySse() {
+      navigator.clipboard.writeText(window.location.origin + '/sse');
+    }
+
+    function copyStarterPrompt() {
+      navigator.clipboard.writeText(starterPromptText());
+    }
+
+    document.getElementById('starterPrompt').value = starterPromptText();
+  </script>
+</body>
+</html>

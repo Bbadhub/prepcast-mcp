@@ -113,23 +113,32 @@
 
       <!-- Next steps -->
       <div class="bg-gray-50 rounded-xl p-4 text-xs text-gray-600 mb-5">
-        <p class="font-semibold text-gray-700 mb-2">Next steps in Claude:</p>
+        <p class="font-semibold text-gray-700 mb-2">3-step Claude quick start:</p>
         <ol class="space-y-1 list-decimal list-inside">
-          <li>Say: <em>"Upload my sales data"</em> and paste your CSV</li>
-          <li>Say: <em>"Analyze my sales history"</em></li>
-          <li>Say: <em>"Forecast Saturday's revenue"</em></li>
-          <li>Say: <em>"Generate my prep list for tomorrow"</em></li>
+          <li>Connect PrepCast in Claude using the SSE URL and bearer token above.</li>
+          <li>Load daily totals: <em>"Use PrepCast and upload my sales data."</em></li>
+          <li>Forecast: <em>"Use PrepCast to forecast YYYY-MM-DD and show 4w/8w math + multipliers."</em></li>
         </ol>
       </div>
 
+      <div class="bg-blue-50 rounded-xl p-4 text-xs text-blue-800 mb-5">
+        <div class="flex items-center justify-between gap-2 mb-2">
+          <p class="font-semibold">Starter prompt (copy into Claude)</p>
+          <button onclick="copyStarterPrompt()" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded-md transition-colors whitespace-nowrap">
+            Copy prompt
+          </button>
+        </div>
+        <textarea id="starterPrompt" readonly class="w-full h-48 bg-white border border-blue-200 rounded-lg p-3 font-mono text-[11px] text-gray-800 resize-y"></textarea>
+      </div>
+
       <div class="flex gap-3">
+        <a href="/getting-started"
+          class="flex-1 text-center border border-indigo-200 hover:border-indigo-300 text-indigo-700 text-sm font-medium py-2.5 rounded-lg transition-colors">
+          View Getting Started
+        </a>
         <a href="/dashboard" id="dashboardLink"
           class="flex-1 text-center bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold py-2.5 rounded-lg transition-colors">
           Open Dashboard
-        </a>
-        <a href="/login"
-          class="flex-1 text-center border border-gray-200 hover:border-gray-300 text-gray-700 text-sm font-medium py-2.5 rounded-lg transition-colors">
-          Sign in later
         </a>
       </div>
     </div>
@@ -159,6 +168,44 @@
         setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
       });
     }
+
+    function starterPromptText() {
+      return [
+        'Use PrepCast tools only. Start by confirming connection with get_status.',
+        '',
+        'Then do this workflow in order:',
+        '1) Run get_sales_summary.',
+        '2) If daily sales history is missing or too short, ask me for the exact data needed and wait.',
+        '3) If I provide files/text, use upload_sales_data (or upload_sales_csv) to ingest it.',
+        '4) Run analyze_history and summarize key weekday patterns.',
+        '5) Build a forecast for [TARGET_DATE] using:',
+        '   - 4-week same-weekday average',
+        '   - 8-week same-weekday average',
+        '   - blended baseline = (0.30 * 4w) + (0.70 * 8w)',
+        '6) Apply event and weather adjustments and show each multiplier and formula.',
+        '7) Output:',
+        '   - Data quality check',
+        '   - Step-by-step math',
+        '   - Final forecast (Low/Base/High)',
+        '   - Prep/staffing recommendations',
+        '',
+        'Rules:',
+        '- Be transparent with assumptions.',
+        '- If data is incomplete, stop and ask before guessing.',
+        '- Show all calculations clearly.',
+      ].join('\n');
+    }
+
+    function copyStarterPrompt() {
+      const text = starterPromptText();
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = document.querySelector('[onclick="copyStarterPrompt()"]');
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = 'Copy prompt'; }, 2000);
+      });
+    }
+
+    document.getElementById('starterPrompt').value = starterPromptText();
 
     // Send payload, retrying silently until server is ready (handles cold start)
     async function sendSignup(payload) {
